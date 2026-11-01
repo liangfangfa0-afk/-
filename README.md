@@ -1,25 +1,17 @@
-# 晕动舒缓（晕动舒缓）
+# 晕动舒缓 MotionGuard
 
-Android 屏幕边缘视觉运动提示应用。
-
-## 核心功能
-- 用户授权后，在其他应用上层显示屏幕四周的半透明小气泡。
-- 气泡根据实时加速度数据产生轻微位移，提供稳定、可感知的外围视觉参照。
-- 使用线性加速度传感器；不可用时回退到加速度计并进行重力分离。
-- 前台服务持续采集传感器，通知栏提供停止入口。
-- 悬浮层不获取焦点、不拦截触摸，用户仍可正常操作当前应用。
-
-## 使用方式
-1. 打开应用，点击“开启屏幕气泡”。
-2. 按系统提示允许“显示在其他应用上层”。
-3. 返回应用后自动启动监测并显示边缘气泡。
-4. 点击应用按钮或运行通知中的“停止气泡”即可关闭。
-
-## 重要说明
-气泡位移是基于设备加速度的视觉提示，不会判断用户是否正在乘车，也不能保证预防或缓解晕动症状。不同设备方向、握持方式和运动环境会影响视觉效果。请勿在驾驶或需要专注操作时调整设置。
-
-## 架构
-本项目是独立 Android 应用，使用 Android 原生 WindowManager 悬浮窗与前台服务。不依赖 LSPosed、Xposed、Root、system_server 或任何 APP/System Hook。工程中已移除 LSPosed API 依赖、模块入口、scope 配置和初始化元数据。
+- 版本：1.0.24
+- 包名：com.ljj.yundongshuhuan
+- 首页 / 设置双页面
+- Liquid Glass 底部导航：背景模糊、AGSL 边缘折射、色散、按压放大镜与拖动切换
+- 不支持 AGSL 的设备会自动回退到兼容底栏
+- 保留运动传感器、悬浮气泡、灵敏度和颜色设置
 
 ## 构建
-通过 GitHub Actions 构建 debug APK。正式发布仍需独立签名与分发配置。
+
+JDK 24、Gradle 8.14.4、AGP 8.13.0、compileSdk 37。
+
+Liquid Glass 模块通过 Git submodule 引入：[wzhdgithub/LiquidGlassBar](https://github.com/wzhdgithub/LiquidGlassBar)。
+该模块采用 GPL-3.0-or-later，第三方来源及版权声明见子模块中的 NOTICE.md 和 LICENSE。
+
+注意：“检查更新”目前为界面入口占位，GitHub OTA 查询、APK 校验和及安装流程尚未接入。Android 普通应用安装 APK 仍需用户在系统安装器中确认。

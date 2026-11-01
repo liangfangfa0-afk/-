@@ -1,0 +1,3 @@
+[submodule "libs/LiquidGlassBar"]
+	path = libs/LiquidGlassBar
+	url = https://github.com/wzhdgithub/LiquidGlassBar.git
