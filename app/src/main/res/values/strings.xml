@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">晕动舒缓</string>
-    <string name="app_description">一款由 ChatGPT 辅助设计与开发的 Android 晕车舒缓功能。</string>
+    <string name="app_description">基于设备运动传感器与屏幕边缘视觉提示的 Android 应用。</string>
 </resources>

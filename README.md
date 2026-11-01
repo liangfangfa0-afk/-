@@ -1,4 +1,4 @@
-# 晕动舒缓（MotionGuard）
+# 晕动舒缓（晕动舒缓）
 
 Android 屏幕边缘视觉运动提示应用。
 
@@ -18,8 +18,8 @@ Android 屏幕边缘视觉运动提示应用。
 ## 重要说明
 气泡位移是基于设备加速度的视觉提示，不会判断用户是否正在乘车，也不能保证预防或缓解晕动症状。不同设备方向、握持方式和运动环境会影响视觉效果。请勿在驾驶或需要专注操作时调整设置。
 
-## LSPosed
-保留 Modern API 102 引导入口，scope 仍限定为 `system`。当前版本使用 Android 悬浮窗权限实现屏幕边缘气泡，不依赖 system_server Hook；LSPosed 不参与气泡绘制和传感器采集。
+## 架构
+本项目是独立 Android 应用，使用 Android 原生 WindowManager 悬浮窗与前台服务。不依赖 LSPosed、Xposed、Root、system_server 或任何 APP/System Hook。工程中已移除 LSPosed API 依赖、模块入口、scope 配置和初始化元数据。
 
 ## 构建
 通过 GitHub Actions 构建 debug APK。正式发布仍需独立签名与分发配置。

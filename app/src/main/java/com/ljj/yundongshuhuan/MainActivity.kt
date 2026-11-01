@@ -1,4 +1,4 @@
-package com.motionguard
+package com.ljj.yundongshuhuan
 
 import android.Manifest
 import android.app.Activity
@@ -46,7 +46,7 @@ class MainActivity : Activity() {
             setBackgroundColor(Color.rgb(8, 16, 30))
         }
         val brand = TextView(this).apply {
-            text = "MOTION  /  GUARD"
+            text = "YUNDONG  /  SHUHUAN"
             textSize = 12f
             letterSpacing = 0.18f
             setTextColor(Color.rgb(123, 181, 238))
@@ -111,7 +111,7 @@ class MainActivity : Activity() {
     }
 
     private fun onMainAction() {
-        val active = getSharedPreferences("motionguard", MODE_PRIVATE).getBoolean("running", false)
+        val active = getSharedPreferences("yundongshuhuan", MODE_PRIVATE).getBoolean("running", false)
         if (active) {
             startService(Intent(this, MotionMonitorService::class.java).setAction(MotionMonitorService.ACTION_STOP))
             actionButton.text = "开启屏幕气泡"
@@ -146,7 +146,7 @@ class MainActivity : Activity() {
             waitingForOverlayPermission = false
             if (Settings.canDrawOverlays(this)) startMonitor()
         }
-        if (getSharedPreferences("motionguard", MODE_PRIVATE).getBoolean("running", false)) {
+        if (getSharedPreferences("yundongshuhuan", MODE_PRIVATE).getBoolean("running", false)) {
             actionButton.text = "停止屏幕气泡"
         }
     }

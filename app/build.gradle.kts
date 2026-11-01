@@ -4,15 +4,15 @@ plugins {
 }
 
 android {
-    namespace = "com.motionguard"
+    namespace = "com.ljj.yundongshuhuan"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.motionguard"
+        applicationId = "com.ljj.yundongshuhuan"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.0.21"
+        versionCode = 22
+        versionName = "1.0.22"
     }
 
     compileOptions {
@@ -32,6 +32,4 @@ android {
 }
 
 dependencies {
-    // The LSPosed framework supplies this API at runtime.
-    compileOnly("io.github.libxposed:api:102.0.0")
 }

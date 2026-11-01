@@ -1,4 +1,4 @@
-package com.motionguard
+package com.ljj.yundongshuhuan
 
 import android.app.*
 import android.content.*
@@ -15,9 +15,9 @@ import java.util.Locale
 
 class MotionMonitorService : Service(), SensorEventListener {
     companion object {
-        const val ACTION_START = "com.motionguard.START"
-        const val ACTION_STOP = "com.motionguard.STOP"
-        const val ACTION_UPDATE = "com.motionguard.UPDATE"
+        const val ACTION_START = "com.ljj.yundongshuhuan.START"
+        const val ACTION_STOP = "com.ljj.yundongshuhuan.STOP"
+        const val ACTION_UPDATE = "com.ljj.yundongshuhuan.UPDATE"
         const val EXTRA_STATUS = "status"
         const val EXTRA_X = "x"
         const val EXTRA_Y = "y"
@@ -84,7 +84,7 @@ class MotionMonitorService : Service(), SensorEventListener {
             stopSelf()
             return
         }
-        getSharedPreferences("motionguard", MODE_PRIVATE).edit().putBoolean("running", true).apply()
+        getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit().putBoolean("running", true).apply()
         if (Settings.canDrawOverlays(this)) showOverlay()
         broadcast("屏幕气泡已开启")
     }
@@ -99,11 +99,11 @@ class MotionMonitorService : Service(), SensorEventListener {
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMIT,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            title = "MotionGuard edge cues"
+            title = "晕动舒缓屏幕边缘提示"
             alpha = 1f
         }
         try {
@@ -137,7 +137,7 @@ class MotionMonitorService : Service(), SensorEventListener {
         if (running) manager.unregisterListener(this)
         running = false
         removeOverlay()
-        getSharedPreferences("motionguard", MODE_PRIVATE).edit().putBoolean("running", false).apply()
+        getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit().putBoolean("running", false).apply()
         stopForeground(STOP_FOREGROUND_REMOVE)
         broadcast("监测已停止")
     }
@@ -233,7 +233,7 @@ class MotionMonitorService : Service(), SensorEventListener {
         manager.unregisterListener(this)
         running = false
         removeOverlay()
-        getSharedPreferences("motionguard", MODE_PRIVATE).edit().putBoolean("running", false).apply()
+        getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit().putBoolean("running", false).apply()
         super.onDestroy()
     }
 }
