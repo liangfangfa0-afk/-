@@ -1,7 +1,7 @@
 package com.ljj.yundongshuhuan
 
 import android.Manifest
-import android.app.Activity
+import androidx.activity.ComponentActivity
 import android.content.*
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -43,7 +43,7 @@ private val Accent = Color(0xFF72C8FF)
 private val Palette = listOf(Color(0xFF55B8F4), Color(0xFF62D9B7), Color(0xFFB89AFF), Color(0xFFFFB969))
 private val PaletteNames = listOf("冰蓝", "薄荷", "柔紫", "暖橙")
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     var status by mutableStateOf("准备就绪"); private set
     var running by mutableStateOf(false); private set
     var sensitivity by mutableFloatStateOf(1.8f); private set
