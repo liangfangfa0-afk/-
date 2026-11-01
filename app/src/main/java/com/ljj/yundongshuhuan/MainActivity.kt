@@ -6,6 +6,7 @@ import android.content.*
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -20,6 +21,11 @@ class MainActivity : Activity() {
     private lateinit var permissionText: TextView
     private var receiverRegistered = false
     private var waitingForOverlayPermission = false
+    private var sensitivity = 1.8f
+    private var colorIndex = 0
+    private lateinit var sensitivityText: TextView
+    private lateinit var preview: BubblePreview
+    private val palette = intArrayOf(0xFF55B8F4.toInt(),0xFF62D9B7.toInt(),0xFFB89AFF.toInt(),0xFFFFB969.toInt())
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -33,6 +39,9 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefs = getSharedPreferences("yundongshuhuan", MODE_PRIVATE)
+        sensitivity = prefs.getFloat("sensitivity",1.8f).coerceIn(0.6f,3.5f)
+        colorIndex = prefs.getInt("bubble_color",0).coerceIn(0,3)
         buildScreen()
         requestNotificationPermission()
         refreshPermissionState()
@@ -66,7 +75,7 @@ class MainActivity : Activity() {
             setTextColor(Color.rgb(174, 190, 211))
             gravity = Gravity.CENTER
         }
-        val preview = BubblePreview(this).apply {
+        preview = BubblePreview(this).apply { setPalette(palette[colorIndex])
             layoutParams = LinearLayout.LayoutParams(-1, dp(260)).apply {
                 topMargin = dp(26)
                 bottomMargin = dp(24)
@@ -86,6 +95,36 @@ class MainActivity : Activity() {
             isAllCaps = false
             setOnClickListener { onMainAction() }
         }
+        sensitivityText = TextView(this).apply { textSize = 13f; setTextColor(Color.rgb(174,200,226)) }
+        val slider = SeekBar(this).apply {
+            max = 29
+            progress = ((sensitivity - 0.6f) * 10).toInt()
+            setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                    if (!fromUser) return
+                    sensitivity = 0.6f + value / 10f
+                    updateSensitivity()
+                    saveConfig()
+                }
+                override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+                override fun onStopTrackingTouch(bar: SeekBar?) = Unit
+            })
+        }
+        val tuneTitle = TextView(this).apply {
+            text = "灵敏度与气泡颜色"; textSize = 16f
+            typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
+            setPadding(0,dp(18),0,dp(4))
+        }
+        val paletteRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
+        arrayOf("冰蓝","薄荷","柔紫","暖橙").forEachIndexed { index, label ->
+            val chip = TextView(this@MainActivity).apply {
+                text = "● $label"; textSize = 12f; gravity = Gravity.CENTER
+                setTextColor(palette[index])
+                setOnClickListener { colorIndex = index; preview.setPalette(palette[index]); saveConfig() }
+            }
+            paletteRow.addView(chip,LinearLayout.LayoutParams(0,dp(44),1f))
+        }
+        updateSensitivity()
         permissionText = TextView(this).apply {
             textSize = 12f
             setTextColor(Color.rgb(155, 174, 199))
@@ -105,6 +144,10 @@ class MainActivity : Activity() {
         root.addView(preview)
         root.addView(stateText)
         root.addView(actionButton, LinearLayout.LayoutParams(-1, dp(54)))
+        root.addView(tuneTitle)
+        root.addView(sensitivityText)
+        root.addView(slider)
+        root.addView(paletteRow)
         root.addView(permissionText)
         root.addView(footer)
         setContentView(root)
@@ -172,19 +215,31 @@ class MainActivity : Activity() {
         super.onStop()
     }
 
+    private fun updateSensitivity() {
+        val label = if (sensitivity < 1.2f) "柔和" else if (sensitivity < 2.1f) "标准" else if (sensitivity < 2.9f) "灵敏" else "高灵敏"
+        sensitivityText.text = label + " · " + String.format(java.util.Locale.US,"%.1f",sensitivity) + "×"
+    }
+    private fun saveConfig() {
+        getSharedPreferences("yundongshuhuan",MODE_PRIVATE).edit().putFloat("sensitivity",sensitivity).putInt("bubble_color",colorIndex).apply()
+        val i = Intent(this,MotionMonitorService::class.java).setAction(MotionMonitorService.ACTION_CONFIG)
+        i.putExtra(MotionMonitorService.EXTRA_SENSITIVITY,sensitivity).putExtra(MotionMonitorService.EXTRA_COLOR,colorIndex)
+        try { startService(i) } catch (_: Exception) {}
+    }
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }
 
 /** Static preview of the perimeter cue shown when the feature is enabled. */
 private class BubblePreview(context: Context) : View(context) {
     private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+    private var bubbleColor = 0xFF55B8F4.toInt()
+    fun setPalette(color: Int) { bubbleColor = color; invalidate() }
     override fun onDraw(canvas: android.graphics.Canvas) {
         super.onDraw(canvas)
         val w = width.toFloat()
         val h = height.toFloat()
         paint.color = Color.rgb(17, 31, 51)
         canvas.drawRoundRect(0f, 0f, w, h, 28f, 28f, paint)
-        paint.color = Color.rgb(88, 157, 224)
+        paint.color = bubbleColor
         val d = resources.displayMetrics.density
         for (i in 0 until 7) {
             val y = h * (i + 1f) / 8f

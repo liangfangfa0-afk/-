@@ -18,6 +18,9 @@ class MotionMonitorService : Service(), SensorEventListener {
         const val ACTION_START = "com.ljj.yundongshuhuan.START"
         const val ACTION_STOP = "com.ljj.yundongshuhuan.STOP"
         const val ACTION_UPDATE = "com.ljj.yundongshuhuan.UPDATE"
+        const val ACTION_CONFIG = "com.ljj.yundongshuhuan.CONFIG"
+        const val EXTRA_SENSITIVITY = "sensitivity"
+        const val EXTRA_COLOR = "bubble_color"
         const val EXTRA_STATUS = "status"
         const val EXTRA_X = "x"
         const val EXTRA_Y = "y"
@@ -40,6 +43,8 @@ class MotionMonitorService : Service(), SensorEventListener {
     private var fy = 0f
     private var fz = 0f
     private var samples = 0
+    private var sensitivity = 1.8f
+    private var bubbleColor = 0
     private var lastBroadcast = 0L
     private val window = ArrayDeque<Float>()
     private var sumSquares = 0.0
@@ -54,6 +59,12 @@ class MotionMonitorService : Service(), SensorEventListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_CONFIG) {
+            sensitivity = intent.getFloatExtra(EXTRA_SENSITIVITY, sensitivity).coerceIn(0.6f,3.5f)
+            bubbleColor = intent.getIntExtra(EXTRA_COLOR, bubbleColor).coerceIn(0,3)
+            overlay?.setStyle(sensitivity,bubbleColor)
+            return START_STICKY
+        }
         if (intent?.action == ACTION_STOP) {
             stopMonitoring()
             stopSelf()
@@ -77,6 +88,9 @@ class MotionMonitorService : Service(), SensorEventListener {
             startForeground(NOTIFICATION_ID, notification)
         }
         resetFilter()
+        val prefs = getSharedPreferences("yundongshuhuan", MODE_PRIVATE)
+        sensitivity = prefs.getFloat("sensitivity",1.8f).coerceIn(0.6f,3.5f)
+        bubbleColor = prefs.getInt("bubble_color",0).coerceIn(0,3)
         running = manager.registerListener(this, s, SensorManager.SENSOR_DELAY_GAME)
         if (!running) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -91,7 +105,7 @@ class MotionMonitorService : Service(), SensorEventListener {
 
     private fun showOverlay() {
         if (overlay != null || !Settings.canDrawOverlays(this)) return
-        val view = EdgeBubbleOverlay(this)
+        val view = EdgeBubbleOverlay(this).apply { setStyle(sensitivity,bubbleColor) }
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
