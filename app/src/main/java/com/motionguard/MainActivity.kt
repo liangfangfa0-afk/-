@@ -1,204 +1,38 @@
 package com.motionguard
-
+import android.Manifest
 import android.app.Activity
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
-import android.os.Bundle
+import android.content.*
+import android.content.pm.PackageManager
+import android.os.*
 import android.view.Gravity
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
+import android.widget.*
 import java.util.Locale
-import kotlin.math.sqrt
 
-class MainActivity : Activity(), SensorEventListener {
-    private lateinit var sensorManager: SensorManager
-    private var motionSensor: Sensor? = null
-    private var isMonitoring = false
-    private lateinit var statusText: TextView
-    private lateinit var valueText: TextView
-    private lateinit var toggleButton: Button
-    private lateinit var cueView: MotionCueView
-
-    private var gravity = FloatArray(3)
-    private var filteredX = 0f
-    private var filteredY = 0f
-    private var filteredZ = 0f
-    private var lastUiUpdate = 0L
-    private var sampleCount = 0
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        motionSensor = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION)
-            ?: sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(28, 32, 28, 24)
-        }
-
-        val title = TextView(this).apply {
-            text = getString(R.string.app_name)
-            textSize = 28f
-            gravity = Gravity.CENTER
-        }
-
-        statusText = TextView(this).apply {
-            text = "尚未开始检测"
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding(0, 12, 0, 8)
-        }
-
-        cueView = MotionCueView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                280
-            ).apply { topMargin = 16 }
-        }
-
-        valueText = TextView(this).apply {
-            text = "等待传感器数据"
-            textSize = 14f
-            gravity = Gravity.CENTER
-            setPadding(0, 16, 0, 16)
-        }
-
-        toggleButton = Button(this).apply {
-            text = "开始检测"
-            setOnClickListener { setMonitoring(!isMonitoring) }
-        }
-
-        val note = TextView(this).apply {
-            text = "第一版仅在本页面打开时采集传感器数据。动态圆点是应用内原型，不会覆盖其他应用。"
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setPadding(0, 20, 0, 0)
-        }
-
-        root.addView(title)
-        root.addView(statusText)
-        root.addView(cueView)
-        root.addView(valueText)
-        root.addView(toggleButton)
-        root.addView(note)
-        setContentView(root)
-    }
-
-    private fun setMonitoring(enabled: Boolean) {
-        if (enabled == isMonitoring) return
-        isMonitoring = enabled
-        if (enabled) {
-            val sensor = motionSensor
-            if (sensor == null) {
-                isMonitoring = false
-                statusText.text = "设备未提供可用的加速度传感器"
-                return
-            }
-            gravity = FloatArray(3)
-            filteredX = 0f
-            filteredY = 0f
-            filteredZ = 0f
-            sampleCount = 0
-            val registered = sensorManager.registerListener(
-                this,
-                sensor,
-                SensorManager.SENSOR_DELAY_GAME
-            )
-            if (!registered) {
-                isMonitoring = false
-                statusText.text = "传感器启动失败"
-                return
-            }
-            toggleButton.text = "停止检测"
-            statusText.text = "正在采集运动数据"
-        } else {
-            sensorManager.unregisterListener(this)
-            toggleButton.text = "开始检测"
-            statusText.text = "检测已停止"
-            valueText.text = "传感器已停止"
-            cueView.setMotion(0f, 0f, 0f)
-        }
-    }
-
-    override fun onSensorChanged(event: SensorEvent) {
-        if (!isMonitoring || event.values.size < 3) return
-
-        val x: Float
-        val y: Float
-        val z: Float
-        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-            val alpha = 0.88f
-            for (i in 0..2) {
-                gravity[i] = alpha * gravity[i] + (1f - alpha) * event.values[i]
-            }
-            x = event.values[0] - gravity[0]
-            y = event.values[1] - gravity[1]
-            z = event.values[2] - gravity[2]
-        } else {
-            x = event.values[0]
-            y = event.values[1]
-            z = event.values[2]
-        }
-
-        val smooth = 0.22f
-        filteredX += smooth * (x - filteredX)
-        filteredY += smooth * (y - filteredY)
-        filteredZ += smooth * (z - filteredZ)
-        sampleCount++
-
-        val magnitude = sqrt(
-            filteredX * filteredX +
-                filteredY * filteredY +
-                filteredZ * filteredZ
-        )
-
-        cueView.setMotion(filteredX, filteredY, magnitude)
-
-        val now = System.currentTimeMillis()
-        if (now - lastUiUpdate > 180L) {
-            lastUiUpdate = now
-            val source = if (event.sensor.type == Sensor.TYPE_LINEAR_ACCELERATION) {
-                "线性加速度传感器"
-            } else {
-                "加速度计（已做重力分离）"
-            }
-            valueText.text = String.format(
-                Locale.getDefault(),
-                "%s\nX %.2f  Y %.2f  Z %.2f m/s²\n强度 %.2f m/s² · 样本 %d",
-                source, filteredX, filteredY, filteredZ, magnitude, sampleCount
-            )
-            statusText.text = if (magnitude > 1.15f) {
-                "检测到较明显的运动变化（不代表已确认乘车）"
-            } else {
-                "正在检测运动变化"
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
-
-    override fun onResume() {
-        super.onResume()
-        // Sensors are registered only after the user explicitly starts monitoring.
-    }
-
-    override fun onPause() {
-        if (isMonitoring) {
-            sensorManager.unregisterListener(this)
-            isMonitoring = false
-            toggleButton.text = "开始检测"
-            statusText.text = "页面离开前已暂停传感器"
-        }
-        super.onPause()
-    }
-
-    override fun onDestroy() {
-        sensorManager.unregisterListener(this)
-        super.onDestroy()
-    }
+class MainActivity:Activity(){
+ private lateinit var statusText:TextView;private lateinit var valuesText:TextView;private lateinit var actionButton:Button;private lateinit var cueView:MotionCueView
+ private var monitoring=false;private var receiverRegistered=false
+ private val receiver=object:BroadcastReceiver(){override fun onReceive(context:Context?,intent:Intent?){
+  if(intent?.action!=MotionMonitorService.ACTION_UPDATE)return
+  val state=intent.getStringExtra(MotionMonitorService.EXTRA_STATUS)?:"等待数据"
+  val x=intent.getFloatExtra(MotionMonitorService.EXTRA_X,0f);val y=intent.getFloatExtra(MotionMonitorService.EXTRA_Y,0f);val z=intent.getFloatExtra(MotionMonitorService.EXTRA_Z,0f)
+  val mag=intent.getFloatExtra(MotionMonitorService.EXTRA_INTENSITY,0f);val rms=intent.getFloatExtra("rms",0f);val count=intent.getIntExtra(MotionMonitorService.EXTRA_SAMPLES,0)
+  statusText.text=state;valuesText.text=String.format(Locale.getDefault(),"X %.2f  Y %.2f  Z %.2f m/s²\n瞬时强度 %.2f · 窗口 RMS %.2f m/s²\n样本 %d",x,y,z,mag,rms,count);cueView.setMotion(x,y,mag)
+  if(state=="监测已停止"||state=="传感器启动失败"||state=="设备没有可用的加速度传感器")setUiRunning(false)
+ }}
+ override fun onCreate(savedInstanceState:Bundle?){super.onCreate(savedInstanceState);buildUi();requestNotificationPermissionIfNeeded()}
+ private fun buildUi(){
+  val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_HORIZONTAL;setPadding(24,28,24,24)}
+  val title=TextView(this).apply{text="晕动舒缓";textSize=28f;gravity=Gravity.CENTER}
+  statusText=TextView(this).apply{text="尚未开始监测";textSize=18f;gravity=Gravity.CENTER;setPadding(0,14,0,10)}
+  cueView=MotionCueView(this).apply{layoutParams=LinearLayout.LayoutParams(-1,260).apply{topMargin=12}}
+  valuesText=TextView(this).apply{text="等待传感器数据";textSize=15f;gravity=Gravity.CENTER;setPadding(0,18,0,18)}
+  actionButton=Button(this).apply{text="开始后台监测";setOnClickListener{toggleMonitoring()}}
+  val note=TextView(this).apply{text="开启后通过前台服务持续采集运动传感器，切换应用后仍可运行。通知栏可停止监测。状态仅代表设备运动特征，不等于识别出乘车，也不能保证缓解晕动。动态提示目前显示在本应用内，不覆盖其他应用。";textSize=12f;gravity=Gravity.CENTER;setPadding(0,18,0,0)}
+  root.addView(title);root.addView(statusText);root.addView(cueView);root.addView(valuesText);root.addView(actionButton);root.addView(note);setContentView(root)
+ }
+ private fun toggleMonitoring(){if(monitoring){startService(Intent(this,MotionMonitorService::class.java).setAction(MotionMonitorService.ACTION_STOP));setUiRunning(false)}else{val i=Intent(this,MotionMonitorService::class.java).setAction(MotionMonitorService.ACTION_START);if(Build.VERSION.SDK_INT>=26)startForegroundService(i)else startService(i);setUiRunning(true)}}
+ private fun setUiRunning(value:Boolean){monitoring=value;actionButton.text=if(value)"停止监测" else "开始后台监测";if(!value){cueView.setMotion(0f,0f,0f);statusText.text="监测已停止"}else if(statusText.text=="监测已停止"||statusText.text=="尚未开始监测")statusText.text="正在启动后台监测"}
+ private fun requestNotificationPermissionIfNeeded(){if(Build.VERSION.SDK_INT>=33&&checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED)requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),100)}
+ override fun onStart(){super.onStart();val f=IntentFilter(MotionMonitorService.ACTION_UPDATE);if(Build.VERSION.SDK_INT>=33)registerReceiver(receiver,f,Context.RECEIVER_NOT_EXPORTED)else registerReceiver(receiver,f);receiverRegistered=true}
+ override fun onStop(){if(receiverRegistered){unregisterReceiver(receiver);receiverRegistered=false};super.onStop()}
 }
