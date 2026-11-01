@@ -8,6 +8,9 @@
 - [x] Fixed initial scope: `system`
 - [x] GitHub Actions debug build workflow
 - [ ] Confirm first CI build succeeds
+- [x] Add foreground sensor sampling prototype
+- [x] Add in-app motion cue visualization prototype
+- [x] Document foreground-only behavior and limitations
 
 ## Stage 1 — Runtime and sensor feasibility
 
