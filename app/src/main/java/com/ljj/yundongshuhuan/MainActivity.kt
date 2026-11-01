@@ -5,6 +5,15 @@ import androidx.activity.ComponentActivity
 import android.content.*
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.os.Environment
+import androidx.core.content.FileProvider
+import org.json.JSONObject
+import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -115,7 +124,90 @@ class MainActivity : ComponentActivity() {
         try { startService(i) } catch (_: Exception) { }
     }
     fun checkUpdates() {
-        Toast.makeText(this, "GitHub OTA 更新检查入口已预留，更新服务尚未接入。", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "正在检查 GitHub 更新…", Toast.LENGTH_SHORT).show()
+        Thread {
+            try {
+                val connection = (URL("https://api.github.com/repos/liangfangfa0-afk/-/releases/latest").openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 12000
+                    readTimeout = 12000
+                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("User-Agent", "MotionGuard-Android")
+                }
+                val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                connection.disconnect()
+                val tag = json.optString("tag_name").removePrefix("v")
+                val remoteCode = tag.substringAfterLast(".").toIntOrNull() ?: 0
+                val currentCode = packageManager.getPackageInfo(packageName, 0).versionName
+                    ?.substringAfterLast(".")?.toIntOrNull() ?: 0
+                val assets = json.optJSONArray("assets")
+                var apkUrl: String? = null
+                if (assets != null) for (i in 0 until assets.length()) {
+                    val asset = assets.getJSONObject(i)
+                    if (asset.optString("name").endsWith(".apk", true)) {
+                        apkUrl = asset.optString("browser_download_url")
+                        break
+                    }
+                }
+                val notes = json.optString("body").ifBlank { "此版本没有提供更新说明。" }
+                Handler(Looper.getMainLooper()).post {
+                    if (remoteCode <= currentCode) {
+                        Toast.makeText(this, "当前已是最新版本", Toast.LENGTH_LONG).show()
+                    } else if (apkUrl.isNullOrBlank()) {
+                        Toast.makeText(this, "发现 $tag，但 Release 中没有 APK", Toast.LENGTH_LONG).show()
+                    } else {
+                        android.app.AlertDialog.Builder(this)
+                            .setTitle("发现新版本 $tag")
+                            .setMessage(notes.take(1200))
+                            .setNegativeButton("稍后", null)
+                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(apkUrl!!) }
+                            .show()
+                    }
+                }
+            } catch (_: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(this, "检查更新失败：网络不可用或暂未发布 Release", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
+    }
+
+    private fun downloadAndInstall(url: String) {
+        Thread {
+            try {
+                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "MotionGuard-Android")
+                }
+                val directory = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
+                val apk = File(directory, "motionguard-update.apk")
+                connection.inputStream.use { input ->
+                    FileOutputStream(apk).use { output -> input.copyTo(output) }
+                }
+                connection.disconnect()
+                Handler(Looper.getMainLooper()).post {
+                    if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+                        startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
+                        Toast.makeText(this, "请允许安装未知来源应用，然后重新检查更新", Toast.LENGTH_LONG).show()
+                        return@post
+                    }
+                    try {
+                        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
+                        val install = Intent(Intent.ACTION_VIEW)
+                            .setDataAndType(uri, "application/vnd.android.package-archive")
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        startActivity(install)
+                    } catch (_: Exception) {
+                        Toast.makeText(this, "无法启动系统安装器", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (_: Exception) {
+                Handler(Looper.getMainLooper()).post {
+                    Toast.makeText(this, "APK 下载失败，请检查网络", Toast.LENGTH_LONG).show()
+                }
+            }
+        }.start()
     }
 }
 
