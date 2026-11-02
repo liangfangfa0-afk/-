@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(i) else startService(i)
         running = true; status = "正在启动气泡提示"
     }
-    fun setThemeMode(value: Int) {
+    fun applyThemeMode(value: Int) {
         themeMode = value.coerceIn(0, 2)
         getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit().putInt("theme_mode", themeMode).apply()
     }
@@ -346,7 +346,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
                 Text("外观模式", color = Color.White, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("跟随系统", "浅色", "深色").forEachIndexed { index, label ->
-                        FilterChip(selected = a.themeMode == index, onClick = { a.setThemeMode(index) }, label = { Text(label) })
+                        FilterChip(selected = a.themeMode == index, onClick = { a.applyThemeMode(index) }, label = { Text(label) })
                     }
                 }
                 Text("不使用系统动态取色，保持中性灰阶外观。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
