@@ -270,16 +270,21 @@ private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
         }
         Card(shape = RoundedCornerShape(27.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
             Box(Modifier.fillMaxWidth().height(210.dp).background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.background)))) {
-                repeat(7) { i ->
-                    val y = ((i + 1) / 8f * 190).dp
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp).padding(top = y), horizontalArrangement = Arrangement.SpaceBetween) {
-                        BubbleDot(accent, 10 + i % 3 * 2)
-                        BubbleDot(accent, 10 + i % 3 * 2)
-                    }
+                val previewDots = listOf(
+                    0.10f to 0.18f, 0.22f to 0.32f, 0.38f to 0.13f, 0.66f to 0.22f, 0.88f to 0.16f,
+                    0.14f to 0.55f, 0.31f to 0.72f, 0.73f to 0.61f, 0.91f to 0.48f,
+                    0.08f to 0.84f, 0.25f to 0.91f, 0.48f to 0.83f, 0.69f to 0.91f, 0.86f to 0.78f,
+                    0.53f to 0.37f, 0.40f to 0.57f, 0.62f to 0.49f
+                )
+                previewDots.forEachIndexed { i, point ->
+                    Box(
+                        Modifier.offset(x = (point.first * 320f).dp, y = (point.second * 190f).dp)
+                            .size((5 + i % 3 * 2).dp)
+                            .background(accent.copy(alpha = .38f + (i % 3) * .12f), CircleShape)
+                    )
                 }
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("●   ·   ●   ·   ●", color = accent.copy(alpha = .8f), fontSize = 12.sp)
-                    Text("动态边缘气泡", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("动态粒子场", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Text("MOTION CUES", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, letterSpacing = 2.sp)
                 }
                 Text("LIVE PREVIEW", Modifier.align(Alignment.BottomStart).padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, letterSpacing = 1.5.sp)
@@ -303,7 +308,7 @@ private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
                     Spacer(Modifier.width(8.dp))
                     Text(if (a.running) "停止屏幕气泡" else "开启屏幕气泡", fontWeight = FontWeight.Bold)
                 }
-                Text("气泡位于屏幕边缘，不拦截触摸操作。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("动态气泡随设备运动流动，不拦截触摸操作。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -409,7 +414,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
             Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("外观能力", color = Color.White, fontWeight = FontWeight.SemiBold)
                 Text(if (glass) "Liquid Glass：AGSL 折射可用" else "Liquid Glass：当前设备将使用兼容底栏", color = if (glass) Color(0xFF6EE7B7) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                Text("版本 1.0.26", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                Text("版本 1.0.27", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
         }
     }
