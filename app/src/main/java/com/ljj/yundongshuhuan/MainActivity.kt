@@ -133,7 +133,7 @@ class MainActivity : ComponentActivity() {
         Thread {
             var connection: HttpURLConnection? = null
             try {
-                connection = (URL("https://api.github.com/repos/liangfangfa0-afk/-/releases/latest").openConnection() as HttpURLConnection).apply {
+                connection = (URL("https://api.github.com/repos/liangfangfa0-afk/MotionGuard/releases/latest").openConnection() as HttpURLConnection).apply {
                     connectTimeout = 12000
                     readTimeout = 12000
                     requestMethod = "GET"
