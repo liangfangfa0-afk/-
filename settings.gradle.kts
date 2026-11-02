@@ -6,4 +6,5 @@ dependencyResolutionManagement {
     repositories { google(); mavenCentral() }
 }
 rootProject.name = "MotionGuard"
-include(":app", ":prismal")
+include(":app", ":prismal", ":liquidglass")
+project(":liquidglass").projectDir = file("libs/LiquidGlassBar/liquidglass")
