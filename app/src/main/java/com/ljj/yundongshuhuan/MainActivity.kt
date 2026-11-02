@@ -14,6 +14,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -52,7 +53,7 @@ private val PaletteNames = listOf("雾灰", "鼠尾草", "灰紫", "砂金")
 class MainActivity : ComponentActivity() {
     var status by mutableStateOf("准备就绪"); private set
     var running by mutableStateOf(false); private set
-    var sensitivity by mutableFloatStateOf(1.8f); private set
+    var sensitivity by mutableFloatStateOf(4.0f); private set
     var paletteIndex by mutableIntStateOf(0); private set
     var themeMode by mutableIntStateOf(0); private set
     private var receiverRegistered = false
@@ -69,7 +70,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("yundongshuhuan", MODE_PRIVATE)
-        sensitivity = prefs.getFloat("sensitivity", 1.8f).coerceIn(0.6f, 3.5f)
+        sensitivity = prefs.getFloat("sensitivity", 4.0f).coerceIn(0.6f, 4.0f)
         paletteIndex = prefs.getInt("bubble_color", 0).coerceIn(0, 3)
         themeMode = prefs.getInt("theme_mode", 0).coerceIn(0, 2)
         running = prefs.getBoolean("running", false)
@@ -119,7 +120,7 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit().putInt("theme_mode", themeMode).apply()
     }
     fun updateConfig(sensitivityValue: Float = sensitivity, colorValue: Int = paletteIndex) {
-        sensitivity = sensitivityValue.coerceIn(0.6f, 3.5f)
+        sensitivity = sensitivityValue.coerceIn(0.6f, 4.0f)
         paletteIndex = colorValue.coerceIn(0, 3)
         getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit()
             .putFloat("sensitivity", sensitivity).putInt("bubble_color", paletteIndex).apply()
@@ -129,53 +130,55 @@ class MainActivity : ComponentActivity() {
         try { startService(i) } catch (_: Exception) { }
     }
     fun checkUpdates(silent: Boolean = false) {
-        if (!silent) Toast.makeText(this, "正在检查 GitHub 更新…", Toast.LENGTH_SHORT).show()
+        if (!silent) Toast.makeText(this, "正在检查 OTA 更新…", Toast.LENGTH_SHORT).show()
         Thread {
             var connection: HttpURLConnection? = null
             try {
-                connection = (URL("https://api.github.com/repos/liangfangfa0-afk/-/releases/latest").openConnection() as HttpURLConnection).apply {
+                connection = (URL("https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json").openConnection() as HttpURLConnection).apply {
                     connectTimeout = 12000
-                    readTimeout = 12000
+                    readTimeout = 15000
                     requestMethod = "GET"
-                    setRequestProperty("Accept", "application/vnd.github+json")
+                    setRequestProperty("Accept", "application/json")
                     setRequestProperty("User-Agent", "MotionGuard-Android")
-                    setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+                    setRequestProperty("Cache-Control", "no-cache")
                 }
                 if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IllegalStateException("GitHub API HTTP ${connection.responseCode}")
+                    throw IllegalStateException("OTA 清单 HTTP ${connection.responseCode}")
                 }
-                val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                val tag = json.optString("tag_name").removePrefix("v")
-                val currentVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
-                val assets = json.optJSONArray("assets")
-                var apkUrl: String? = null
-                if (assets != null) for (i in 0 until assets.length()) {
-                    val asset = assets.getJSONObject(i)
-                    if (asset.optString("name").endsWith(".apk", true)) {
-                        apkUrl = asset.optString("browser_download_url").takeIf { it.startsWith("https://") }
-                        break
-                    }
-                }
-                val notes = json.optString("body").trim().ifBlank { "此版本暂无更新日志。" }
-                val hasUpdate = compareVersions(tag, currentVersion) > 0
-                val downloadUrl = apkUrl
+                val manifest = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                require(manifest.optString("appId") == packageName) { "OTA 清单应用标识不匹配" }
+                val remoteCode = manifest.optLong("versionCode", -1L)
+                require(remoteCode > 0L) { "OTA 清单版本号无效" }
+                val currentInfo = packageManager.getPackageInfo(packageName, 0)
+                val currentCode = if (Build.VERSION.SDK_INT >= 28) currentInfo.longVersionCode else currentInfo.versionCode.toLong()
+                val currentVersion = currentInfo.versionName ?: "未知"
+                val tag = manifest.optString("versionName", "未知")
+                val apk = manifest.optJSONObject("apk") ?: throw IllegalStateException("OTA 清单缺少 APK 信息")
+                val downloadUrl = apk.optString("url")
+                val sha256 = apk.optString("sha256").lowercase(Locale.ROOT)
+                require(downloadUrl.startsWith("https://")) { "APK 地址必须使用 HTTPS" }
+                require(sha256.matches(Regex("[a-f0-9]{64}"))) { "APK SHA-256 格式无效" }
+                val notes = manifest.optString("releaseNotes").trim().ifBlank { "此版本暂无更新日志。" }
+                val mandatory = manifest.optBoolean("mandatory", false)
+                val minimumCode = manifest.optLong("minimumSupportedVersionCode", 1L)
+                val hasUpdate = remoteCode > currentCode
                 Handler(Looper.getMainLooper()).post {
-                    if (hasUpdate && !downloadUrl.isNullOrBlank()) {
-                        android.app.AlertDialog.Builder(this)
+                    if (hasUpdate) {
+                        val builder = android.app.AlertDialog.Builder(this)
                             .setTitle("发现新版本  v$tag")
-                            .setMessage("当前版本：v$currentVersion\n最新版本：v$tag\n\n更新日志\n$notes".take(6000))
-                            .setNegativeButton("稍后更新", null)
-                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(downloadUrl) }
-                            .setCancelable(true)
-                            .show()
+                            .setMessage("当前版本：v$currentVersion（$currentCode）\n最新版本：v$tag（$remoteCode）\n\n更新日志\n$notes".take(6000))
+                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(downloadUrl, sha256) }
+                            .setCancelable(!mandatory)
+                        if (!mandatory) builder.setNegativeButton("稍后更新", null)
+                        builder.show()
                     } else if (!silent) {
-                        val message = if (hasUpdate) "发现 v$tag，但云端 Release 尚未上传 APK" else "当前已是最新版本（v$currentVersion）"
+                        val message = if (currentCode < minimumCode) "当前版本已低于最低支持版本，请联系项目维护者" else "当前已是最新版本（v$currentVersion）"
                         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
                 Handler(Looper.getMainLooper()).post {
-                    if (!silent) Toast.makeText(this, "检查更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
+                    if (!silent) Toast.makeText(this, "检查 OTA 更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
                 }
             } finally {
                 connection?.disconnect()
@@ -196,7 +199,7 @@ class MainActivity : ComponentActivity() {
         return 0
     }
 
-    private fun downloadAndInstall(url: String) {
+    private fun downloadAndInstall(url: String, expectedSha256: String) {
         Thread {
             try {
                 val connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -211,6 +214,20 @@ class MainActivity : ComponentActivity() {
                     FileOutputStream(apk).use { output -> input.copyTo(output) }
                 }
                 connection.disconnect()
+                val digest = MessageDigest.getInstance("SHA-256")
+                val actualSha256 = apk.inputStream().use { input ->
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        digest.update(buffer, 0, count)
+                    }
+                    digest.digest().joinToString("") { "%02x".format(it) }
+                }
+                if (!actualSha256.equals(expectedSha256, ignoreCase = true)) {
+                    apk.delete()
+                    throw SecurityException("APK SHA-256 校验失败，已取消安装")
+                }
                 Handler(Looper.getMainLooper()).post {
                     if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
                         startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
@@ -229,7 +246,7 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (_: Exception) {
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(this, "APK 下载失败，请检查网络", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "APK 下载或完整性校验失败，已取消安装", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
@@ -392,7 +409,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
                     Spacer(Modifier.weight(1f))
                     Text(String.format(Locale.US, "%.1f×", a.sensitivity), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
-                Slider(value = a.sensitivity, onValueChange = { a.updateConfig(sensitivityValue = it) }, valueRange = .6f..3.5f)
+                Slider(value = a.sensitivity, onValueChange = { a.updateConfig(sensitivityValue = it) }, valueRange = .6f..4.0f)
                 Text("数值越高，气泡对设备运动的响应越明显。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
@@ -433,10 +450,17 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .72f)), shape = RoundedCornerShape(19.dp)) {
-            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("外观能力", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Text(if (glass) "Liquid Glass：AGSL 折射可用" else "Liquid Glass：当前设备将使用兼容底栏", color = if (glass) Color(0xFF6EE7B7) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 Text("版本 ${a.packageManager.getPackageInfo(a.packageName, 0).versionName ?: "未知"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
+                Text("开源许可与第三方声明", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                Text("本应用按 GNU GPL-3.0-or-later 发布。液态玻璃底栏采用 LiquidGlassBar（GPL-3.0-or-later），其实现包含来自 KernelSU 的 GPL 组件，并使用 AndroidLiquidGlass 与 Miuix 的 Apache-2.0 组件。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("LiquidGlassBar 项目与完整第三方版权、许可清单", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
+                    modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/wzhdgithub/LiquidGlassBar"))) })
+                Text("本应用源码及 GPL-3.0 许可", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
+                    modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/liangfangfa0-afk/-"))) })
             }
         }
     }
