@@ -9,7 +9,7 @@ import kotlin.random.Random
 /** Free-moving particle field; particles are not attached to fixed screen edges. */
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
-        var x: Float, var y: Float, val radius: Float, val alpha: Float,
+        var x: Float, var y: Float, val radius: Float,
         val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float
     )
 
