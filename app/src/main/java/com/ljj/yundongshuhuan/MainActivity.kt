@@ -48,8 +48,6 @@ import com.styropyr0.prismal.PrismalGlassSurface
 import com.styropyr0.prismal.sources.PrismalGlassLayer
 import com.styropyr0.prismal.sources.prismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
-import com.styropyr0.prismal.components.PrismalGlassBottomTabs
-import com.styropyr0.prismal.components.PrismalGlassBottomTab
 import com.styropyr0.prismal.components.PrismalGlassButton
 import com.styropyr0.prismal.components.PrismalGlassSlider
 import com.styropyr0.prismal.components.PrismalGlassToggle
@@ -309,27 +307,12 @@ private fun MotionGuardApp(activity: MainActivity) {
     val backdrop = rememberPrismalGlassLayer()
     MaterialTheme(colorScheme = scheme) {
         Box(Modifier.fillMaxSize()) {
-            // A dedicated recorded backdrop gives every glass control a real surface to refract.
+            // Keep the recorded backdrop neutral; glass surfaces must not repaint the page background.
             Box(
                 Modifier.fillMaxSize()
-                    .background(Brush.linearGradient(listOf(
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.surfaceVariant,
-                        MaterialTheme.colorScheme.background
-                    )))
+                    .background(MaterialTheme.colorScheme.background)
                     .prismalGlassLayer(backdrop)
-            ) {
-                Box(
-                    Modifier.align(Alignment.TopEnd).padding(top = 92.dp, end = 26.dp)
-                        .size(190.dp).clip(CircleShape)
-                        .background(Color(0xFF8AA7B8).copy(alpha = if (dark) .12f else .18f))
-                )
-                Box(
-                    Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 100.dp)
-                        .size(150.dp).clip(CircleShape)
-                        .background(Color(0xFFB6A4C9).copy(alpha = if (dark) .10f else .16f))
-                )
-            }
+            )
             AnimatedContent(
                 targetState = tab,
                 modifier = Modifier.fillMaxSize(),
@@ -338,22 +321,51 @@ private fun MotionGuardApp(activity: MainActivity) {
                 if (page == 0) HomePage(activity, backdrop, Modifier.fillMaxSize())
                 else SettingsPage(activity, backdrop, Modifier.fillMaxSize())
             }
-            PrismalGlassBottomTabs(
-                selectedTabIndex = { tab },
-                onTabSelected = { tab = it },
+            // One glass container + plain clickable items: avoid nested tab-bar glass layers.
+            PrismalGlassSurface(
                 backdrop = backdrop,
-                tabsCount = 2,
                 modifier = Modifier.align(Alignment.BottomCenter)
                     .fillMaxWidth().padding(horizontal = 25.dp, vertical = 13.dp),
-                tintDropletContent = false
+                shape = { PrismalRoundedRectangle(22.dp) },
+                blurRadius = 13.dp,
+                saturation = 1.15f,
+                refractionHeightPx = 8f,
+                refractionAmountPx = 10f,
+                tint = MaterialTheme.colorScheme.surface,
+                tintAlpha = if (dark) 0.48f else 0.62f
             ) {
-                PrismalGlassBottomTab(onClick = { tab = 0 }) {
-                    Icon(Icons.Rounded.Home, null, tint = MaterialTheme.colorScheme.onSurface)
-                    Text("首页", color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp)
-                }
-                PrismalGlassBottomTab(onClick = { tab = 1 }) {
-                    Icon(Icons.Rounded.Settings, null, tint = MaterialTheme.colorScheme.onSurface)
-                    Text("设置", color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp)
+                Row(
+                    Modifier.fillMaxWidth().padding(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf("首页" to Icons.Rounded.Home, "设置" to Icons.Rounded.Settings)
+                        .forEachIndexed { index, item ->
+                            val selected = tab == index
+                            Column(
+                                Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
+                                    .background(
+                                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = if (dark) 0.24f else 0.14f)
+                                        else Color.Transparent
+                                    )
+                                    .clickable { tab = index }
+                                    .padding(vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Icon(
+                                    item.second,
+                                    contentDescription = item.first,
+                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    item.first,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    fontSize = 11.sp,
+                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            }
+                        }
                 }
             }
         }
@@ -367,16 +379,17 @@ private fun GlassPanel(
     radius: androidx.compose.ui.unit.Dp = 24.dp,
     content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit
 ) {
+    val darkSurface = MaterialTheme.colorScheme.background == Color(0xFF111318)
     PrismalGlassSurface(
         backdrop = backdrop,
         modifier = modifier,
         shape = { PrismalRoundedRectangle(radius) },
-        blurRadius = 15.dp,
-        saturation = 1.45f,
-        refractionHeightPx = 13f,
-        refractionAmountPx = 22f,
-        tint = Color.White,
-        tintAlpha = 0.10f,
+        blurRadius = 12.dp,
+        saturation = 1.18f,
+        refractionHeightPx = 8f,
+        refractionAmountPx = 10f,
+        tint = MaterialTheme.colorScheme.surface,
+        tintAlpha = if (darkSurface) 0.42f else 0.56f,
         content = content
     )
 }
@@ -396,8 +409,8 @@ private fun GlassActionButton(
         modifier = modifier,
         height = height,
         shape = { PrismalRoundedRectangle(16.dp) },
-        tint = if (selected) MaterialTheme.colorScheme.primary else Color.White,
-        tintAlpha = if (selected) 0.20f else 0.08f,
+        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+        tintAlpha = if (selected) 0.22f else if (MaterialTheme.colorScheme.background == Color(0xFF111318)) 0.38f else 0.52f,
         contentPadding = PaddingValues(horizontal = 15.dp, vertical = 8.dp),
         content = content
     )
