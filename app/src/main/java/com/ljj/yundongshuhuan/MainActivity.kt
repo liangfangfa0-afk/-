@@ -150,7 +150,7 @@ class MainActivity : ComponentActivity() {
                 val remoteCode = manifest.optLong("versionCode", -1L)
                 require(remoteCode > 0L) { "OTA 清单版本号无效" }
                 val currentInfo = packageManager.getPackageInfo(packageName, 0)
-                val currentCode = if (Build.VERSION.SDK_INT >= 28) currentInfo.longVersionCode else @Suppress("DEPRECATION") currentInfo.versionCode.toLong()
+                val currentCode = if (Build.VERSION.SDK_INT >= 28) currentInfo.longVersionCode else currentInfo.versionCode.toLong()
                 val currentVersion = currentInfo.versionName ?: "未知"
                 val tag = manifest.optString("versionName", "未知")
                 val apk = manifest.optJSONObject("apk") ?: throw IllegalStateException("OTA 清单缺少 APK 信息")
