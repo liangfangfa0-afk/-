@@ -132,20 +132,47 @@ class MainActivity : ComponentActivity() {
     fun checkUpdates(silent: Boolean = false) {
         if (!silent) Toast.makeText(this, "正在检查 OTA 更新…", Toast.LENGTH_SHORT).show()
         Thread {
-            var connection: HttpURLConnection? = null
             try {
-                connection = (URL("https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json").openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 12000
-                    readTimeout = 15000
-                    requestMethod = "GET"
-                    setRequestProperty("Accept", "application/json")
-                    setRequestProperty("User-Agent", "MotionGuard-Android")
-                    setRequestProperty("Cache-Control", "no-cache")
+                // GitHub 原始地址优先；公共 CDN 作为无账号备用分发源。
+                // CDN 可能有缓存延迟，因此每次检查均按顺序尝试，且不改变清单校验规则。
+                val manifestSources = listOf(
+                    "https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json",
+                    "https://cdn.jsdelivr.net/gh/liangfangfa0-afk/MotionGuard@main/ota/stable.json",
+                    "https://githubraw.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json"
+                )
+                var manifestText: String? = null
+                var lastSourceError = "没有可用的 OTA 清单源"
+                for (source in manifestSources) {
+                    var sourceConnection: HttpURLConnection? = null
+                    try {
+                        sourceConnection = (URL(source).openConnection() as HttpURLConnection).apply {
+                            connectTimeout = 8000
+                            readTimeout = 12000
+                            requestMethod = "GET"
+                            instanceFollowRedirects = true
+                            setRequestProperty("Accept", "application/json")
+                            setRequestProperty("User-Agent", "MotionGuard-Android")
+                            setRequestProperty("Cache-Control", "no-cache")
+                        }
+                        val response = sourceConnection.responseCode
+                        if (response != HttpURLConnection.HTTP_OK) {
+                            lastSourceError = "清单源 HTTP $response"
+                            continue
+                        }
+                        manifestText = sourceConnection.inputStream.bufferedReader().use { it.readText() }
+                        if (manifestText.isNullOrBlank()) {
+                            lastSourceError = "清单源返回空内容"
+                            manifestText = null
+                            continue
+                        }
+                        break
+                    } catch (sourceError: Exception) {
+                        lastSourceError = sourceError.message ?: "清单源连接失败"
+                    } finally {
+                        sourceConnection?.disconnect()
+                    }
                 }
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IllegalStateException("OTA 清单 HTTP ${connection.responseCode}")
-                }
-                val manifest = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                val manifest = JSONObject(manifestText ?: throw IllegalStateException(lastSourceError))
                 require(manifest.optString("appId") == packageName) { "OTA 清单应用标识不匹配" }
                 val remoteCode = manifest.optLong("versionCode", -1L)
                 require(remoteCode > 0L) { "OTA 清单版本号无效" }
