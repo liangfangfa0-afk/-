@@ -3,10 +3,10 @@
   "versionCode": 31,
   "versionName": "1.0.31",
   "apk": {
-    "url": "https://github.com/liangfangfa0-afk/MotionGuard/releases/download/v1.0.31-test/MotionGuard-v1.0.31-test.apk",
-    "sha256": "2b80fffb2fe8970f5bbb30be501896db75dbd65157982df02c98b90032411629"
+    "url": "https://github.com/liangfangfa0-afk/MotionGuard/releases/download/v1.0.31/MotionGuard-v1.0.31.apk",
+    "sha256": "22d00d2ef182facbc50f79b495420dc8506e21f58d6cd751064cacc04b4a861a"
   },
-  "releaseNotes": "MotionGuard 1.0.31：完成液态玻璃底部栏与 OTA 更新流程接入，优化应用界面和运行体验。",
+  "releaseNotes": "MotionGuard 1.0.31：正式版发布，包含液态玻璃界面、传感器气泡提示与 OTA 更新流程。",
   "mandatory": false,
   "minimumSupportedVersionCode": 1
 }
