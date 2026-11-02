@@ -2,11 +2,11 @@
 
 一款 Android 晕动舒缓辅助应用，通过运动传感器与悬浮视觉提示，尝试帮助用户在乘车等场景中减轻视觉与运动感受之间的不适。
 
-- 当前版本：**1.0.31**
+- 当前版本：**1.0.32**
 - 应用包名：`com.ljj.yundongshuhuan`
 - 最低 Android 版本：Android 8.0（API 26）
 - 主要能力：运动传感器读取、动态粒子气泡悬浮层、灵敏度与颜色设置
-- 界面使用 Jetpack Compose，并通过 Git submodule 引入 [LiquidGlassBar](https://github.com/wzhdgithub/LiquidGlassBar)。
+- 界面使用 Jetpack Compose；全局液态玻璃材质采用 [PrismalAGSL](https://github.com/styropyr0/PrismalAGSL)，包含背景采样、AGSL 折射、模糊、高光，以及液态玻璃按钮、滑块、开关和底部导航。PrismalAGSL 使用 MIT License。
 
 ## 下载
 
@@ -19,7 +19,7 @@
 - Android Gradle Plugin 8.13.0
 - compileSdk 37
 
-本仓库通过 `libs/LiquidGlassBar` Git submodule 引入 LiquidGlassBar，克隆后请使用：
+本仓库保留原有 LiquidGlassBar submodule 以兼容历史代码；当前全局液态玻璃依赖通过 JitPack 获取 PrismalAGSL v1.0.4。克隆后请使用：
 
 ```bash
 git clone --recurse-submodules https://github.com/liangfangfa0-afk/MotionGuard.git
@@ -31,7 +31,7 @@ git clone --recurse-submodules https://github.com/liangfangfa0-afk/MotionGuard.g
 
 ## 许可
 
-本项目按 **GNU GPL v3.0 或更高版本**发布，详见根目录 [LICENSE](LICENSE)。液态玻璃底栏采用 [LiquidGlassBar](https://github.com/wzhdgithub/LiquidGlassBar)，其项目许可证为 GPL-3.0-or-later；其 NOTICE 列明实际采用的 KernelSU（GPL-3.0-or-later）、AndroidLiquidGlass（Apache-2.0）及 Miuix（Apache-2.0）代码/组件。AndroidX 与 Jetpack Compose 依赖采用 Apache-2.0。应用内“设置 → 开源许可与第三方声明”提供来源入口；完整第三方声明请参阅上游 [NOTICE.md](https://github.com/wzhdgithub/LiquidGlassBar/blob/main/NOTICE.md)。
+本项目按 **GNU GPL v3.0 或更高版本**发布，详见根目录 [LICENSE](LICENSE)。全局液态玻璃引擎采用 [PrismalAGSL](https://github.com/styropyr0/PrismalAGSL)，许可证为 MIT。AndroidX 与 Jetpack Compose 依赖采用 Apache-2.0。应用内“设置 → 开源许可与第三方声明”提供来源入口。
 
 ## 重要说明
 
