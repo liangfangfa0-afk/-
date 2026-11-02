@@ -43,7 +43,7 @@ class MotionMonitorService : Service(), SensorEventListener {
     private var fy = 0f
     private var fz = 0f
     private var samples = 0
-    private var sensitivity = 1.8f
+    private var sensitivity = 4.0f
     private var bubbleColor = 0
     private var lastBroadcast = 0L
     private val window = ArrayDeque<Float>()
@@ -60,7 +60,7 @@ class MotionMonitorService : Service(), SensorEventListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_CONFIG) {
-            sensitivity = intent.getFloatExtra(EXTRA_SENSITIVITY, sensitivity).coerceIn(0.6f,3.5f)
+            sensitivity = intent.getFloatExtra(EXTRA_SENSITIVITY, sensitivity).coerceIn(0.6f,4.0f)
             bubbleColor = intent.getIntExtra(EXTRA_COLOR, bubbleColor).coerceIn(0,3)
             overlay?.setStyle(sensitivity,bubbleColor)
             return START_STICKY
@@ -89,7 +89,7 @@ class MotionMonitorService : Service(), SensorEventListener {
         }
         resetFilter()
         val prefs = getSharedPreferences("yundongshuhuan", MODE_PRIVATE)
-        sensitivity = prefs.getFloat("sensitivity",1.8f).coerceIn(0.6f,3.5f)
+        sensitivity = prefs.getFloat("sensitivity",4.0f).coerceIn(0.6f,4.0f)
         bubbleColor = prefs.getInt("bubble_color",0).coerceIn(0,3)
         running = manager.registerListener(this, s, SensorManager.SENSOR_DELAY_GAME)
         if (!running) {
