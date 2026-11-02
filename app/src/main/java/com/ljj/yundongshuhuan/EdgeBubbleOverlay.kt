@@ -12,7 +12,7 @@ import kotlin.random.Random
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
         var x: Float, var y: Float, val radius: Float, val alpha: Float,
-        val driftX: Float, val driftY: Float, val phase: Float
+        val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float
     )
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -40,7 +40,7 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
 
     fun updateMotion(x: Float, y: Float, magnitude: Float) {
         val gain = sensitivity / 1.8f
-        targetX = (-x / 3.2f * gain).coerceIn(-1.4f, 1.4f)
+        targetX = (x / 3.2f * gain).coerceIn(-1.4f, 1.4f)
         targetY = (-y / 3.2f * gain).coerceIn(-1.4f, 1.4f)
         postInvalidateOnAnimation()
     }
@@ -56,11 +56,11 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             particles += Particle(
                 x = nx.coerceIn(0.035f, 0.965f) * w,
                 y = ny.coerceIn(0.035f, 0.965f) * h,
-                radius = dp(1.7f + random.nextFloat() * 1.8f),
+                radius = dp(1.4f + random.nextFloat() * 2.8f),
                 alpha = 0.28f + random.nextFloat() * 0.42f,
                 driftX = (random.nextFloat() - 0.5f) * dp(8f),
                 driftY = (random.nextFloat() - 0.5f) * dp(8f),
-                phase = random.nextFloat() * 6.28f
+                phase = random.nextFloat() * 6.28f,\n                sizeAmplitude = 0.10f + random.nextFloat() * 0.22f
             )
         }
         fieldWidth = w
@@ -103,7 +103,7 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             val pulse = 0.88f + 0.12f * kotlin.math.sin(elapsed * 1.1f + particle.phase)
             val alpha = min(255, max(0, (particle.alpha * pulse * 255f).toInt()))
             fill.color = (color and 0x00FFFFFF) or (alpha shl 24)
-            canvas.drawCircle(particle.x, particle.y, particle.radius, fill)
+            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.35f + particle.phase)\n            canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
         }
         postInvalidateOnAnimation()
     }
