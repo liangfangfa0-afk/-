@@ -10,7 +10,7 @@
 
 ## 下载
 
-正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/-/releases) 下载。Actions 中的构建产物仅用于 CI 测试，不作为长期发布地址。
+正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases) 下载。Actions 中的构建产物仅用于 CI 测试，不作为长期发布地址。
 
 ## 构建环境
 
@@ -22,7 +22,7 @@
 本仓库通过 `libs/LiquidGlassBar` Git submodule 引入 LiquidGlassBar，克隆后请使用：
 
 ```bash
-git clone --recurse-submodules https://github.com/liangfangfa0-afk/-.git
+git clone --recurse-submodules https://github.com/liangfangfa0-afk/MotionGuard.git
 ```
 
 ## 发布方式
