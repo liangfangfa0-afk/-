@@ -15,8 +15,10 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '24'
+          java-version: '17'
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload APK
