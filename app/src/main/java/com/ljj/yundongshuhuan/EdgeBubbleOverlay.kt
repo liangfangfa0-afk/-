@@ -4,20 +4,29 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
-import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.random.Random
 
+/** Free-moving particle field; particles are not attached to fixed screen edges. */
 class EdgeBubbleOverlay(context: Context) : View(context) {
+    private data class Particle(
+        var x: Float, var y: Float, val radius: Float, val alpha: Float,
+        val driftX: Float, val driftY: Float, val phase: Float
+    )
+
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = dp(0.7f)
-        color = 0x35FFFFFF
-    }
-    private var motionX = 0f
-    private var motionY = 0f
-    private var intensity = 0f
+    private val particles = ArrayList<Particle>()
+    private var fieldWidth = 0f
+    private var fieldHeight = 0f
+    private var lastFrameNanos = 0L
+    private var targetX = 0f
+    private var targetY = 0f
+    private var flowX = 0f
+    private var flowY = 0f
     private var sensitivity = 1.8f
     private var paletteIndex = 0
+    private var elapsed = 0f
     private val palettes = intArrayOf(
         0xFFB8B8B8.toInt(), 0xFF82B7A0.toInt(),
         0xFFAA9AC8.toInt(), 0xFFD0A36D.toInt()
@@ -31,11 +40,32 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
 
     fun updateMotion(x: Float, y: Float, magnitude: Float) {
         val gain = sensitivity / 1.8f
-        // Reverse the measured acceleration for the visual cue direction.
-        motionX = (-x / 2.5f * gain).coerceIn(-1.35f, 1.35f)
-        motionY = (-y / 2.5f * gain).coerceIn(-1.35f, 1.35f)
-        intensity = (magnitude / 2.1f * gain).coerceIn(0f, 1.2f)
+        targetX = (-x / 3.2f * gain).coerceIn(-1.4f, 1.4f)
+        targetY = (-y / 3.2f * gain).coerceIn(-1.4f, 1.4f)
         postInvalidateOnAnimation()
+    }
+
+    private fun seedParticles(w: Float, h: Float) {
+        particles.clear()
+        val random = Random(2701)
+        repeat(54) {
+            val angle = random.nextFloat() * (Math.PI.toFloat() * 2f)
+            val radius = 0.28f + random.nextFloat() * 0.67f
+            val nx = 0.5f + kotlin.math.cos(angle) * radius * 0.48f
+            val ny = 0.5f + kotlin.math.sin(angle) * radius * 0.46f
+            particles += Particle(
+                x = nx.coerceIn(0.035f, 0.965f) * w,
+                y = ny.coerceIn(0.035f, 0.965f) * h,
+                radius = dp(1.7f + random.nextFloat() * 1.8f),
+                alpha = 0.28f + random.nextFloat() * 0.42f,
+                driftX = (random.nextFloat() - 0.5f) * dp(8f),
+                driftY = (random.nextFloat() - 0.5f) * dp(8f),
+                phase = random.nextFloat() * 6.28f
+            )
+        }
+        fieldWidth = w
+        fieldHeight = h
+        lastFrameNanos = 0L
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -43,46 +73,39 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         val w = width.toFloat()
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
+        if (particles.isEmpty() || w != fieldWidth || h != fieldHeight) seedParticles(w, h)
+
+        val now = System.nanoTime()
+        val dt = if (lastFrameNanos == 0L) 0.016f
+            else ((now - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.04f)
+        lastFrameNanos = now
+        elapsed += dt
+
+        val response = 1f - kotlin.math.exp(-dt * 3.8f)
+        flowX += (targetX - flowX) * response
+        flowY += (targetY - flowY) * response
+        val velocityX = flowX * dp(205f)
+        val velocityY = flowY * dp(205f)
         val color = palettes[paletteIndex]
-        val top = dp(54f)
-        val bottom = h - dp(58f)
-        val sideInset = dp(17f)
-        val radius = dp(3.1f) + dp(0.8f) * intensity
 
-        // Horizontal cue: the row translates opposite to the sensed lateral acceleration.
-        val horizontalShift = motionX * dp(44f)
-        val count = 9
-        for (i in 0 until count) {
-            val baseX = w * (i + 0.5f) / count
-            val x = wrap(baseX + horizontalShift, w)
-            val taper = 0.52f + 0.48f * (1f - abs(i - (count - 1) / 2f) / (count / 2f))
-            val r = radius * taper
-            drawDot(canvas, x, top, r, color, 0.72f)
-            drawDot(canvas, x, bottom, r, color, 0.72f)
+        particles.forEach { particle ->
+            val localX = particle.driftX * kotlin.math.sin(elapsed * 0.72f + particle.phase)
+            val localY = particle.driftY * kotlin.math.cos(elapsed * 0.64f + particle.phase)
+            particle.x += (velocityX + localX) * dt
+            particle.y += (velocityY + localY) * dt
+
+            val margin = dp(12f)
+            if (particle.x < -margin) particle.x = w + margin
+            if (particle.x > w + margin) particle.x = -margin
+            if (particle.y < -margin) particle.y = h + margin
+            if (particle.y > h + margin) particle.y = -margin
+
+            val pulse = 0.88f + 0.12f * kotlin.math.sin(elapsed * 1.1f + particle.phase)
+            val alpha = min(255, max(0, (particle.alpha * pulse * 255f).toInt()))
+            fill.color = (color and 0x00FFFFFF) or (alpha shl 24)
+            canvas.drawCircle(particle.x, particle.y, particle.radius, fill)
         }
-
-        // Vertical cue: front/back motion uses the same reversed mapping on the Y axis.
-        val verticalShift = motionY * dp(34f)
-        for (i in 0 until 7) {
-            val baseY = top + (bottom - top) * (i + 0.5f) / 7f
-            val y = wrap(baseY + verticalShift - top, bottom - top) + top
-            val taper = 0.62f + 0.38f * (1f - abs(i - 3f) / 4f)
-            val r = radius * taper
-            drawDot(canvas, sideInset, y, r, color, 0.68f)
-            drawDot(canvas, w - sideInset, y, r, color, 0.68f)
-        }
-    }
-
-    private fun drawDot(canvas: Canvas, x: Float, y: Float, radius: Float, color: Int, opacity: Float) {
-        fill.color = (color and 0x00FFFFFF) or (((0x55 + (opacity * 0x35).toInt()).coerceIn(0, 255)) shl 24)
-        canvas.drawCircle(x, y, radius, fill)
-        rim.color = 0x28FFFFFF
-        canvas.drawCircle(x, y, radius, rim)
-    }
-
-    private fun wrap(value: Float, range: Float): Float {
-        if (range <= 0f) return value
-        return ((value % range) + range) % range
+        postInvalidateOnAnimation()
     }
 
     private fun dp(value: Float) = value * resources.displayMetrics.density
