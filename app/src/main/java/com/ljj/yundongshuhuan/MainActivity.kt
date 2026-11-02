@@ -158,13 +158,14 @@ class MainActivity : ComponentActivity() {
                 }
                 val notes = json.optString("body").trim().ifBlank { "此版本暂无更新日志。" }
                 val hasUpdate = compareVersions(tag, currentVersion) > 0
+                val downloadUrl = apkUrl
                 Handler(Looper.getMainLooper()).post {
-                    if (hasUpdate && !apkUrl.isNullOrBlank()) {
+                    if (hasUpdate && !downloadUrl.isNullOrBlank()) {
                         android.app.AlertDialog.Builder(this)
                             .setTitle("发现新版本  v$tag")
                             .setMessage("当前版本：v$currentVersion\n最新版本：v$tag\n\n更新日志\n$notes".take(6000))
                             .setNegativeButton("稍后更新", null)
-                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(apkUrl) }
+                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(downloadUrl) }
                             .setCancelable(true)
                             .show()
                     } else if (!silent) {
