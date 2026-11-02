@@ -52,6 +52,7 @@ import com.styropyr0.prismal.components.PrismalGlassButton
 import com.styropyr0.prismal.components.PrismalGlassSlider
 import com.styropyr0.prismal.components.PrismalGlassToggle
 import com.styropyr0.prismal.shapes.PrismalRoundedRectangle
+import io.github.wzhdgithub.liquidglass.*
 import java.util.Locale
 
 private val Palette = listOf(Color(0xFFB8B8B8), Color(0xFF82B7A0), Color(0xFFAA9AC8), Color(0xFFD0A36D))
@@ -295,6 +296,7 @@ private fun MotionGuardApp(activity: MainActivity) {
     var tab by remember { mutableIntStateOf(0) }
     val systemDark = isSystemInDarkTheme()
     val dark = when (activity.themeMode) { 1 -> false; 2 -> true; else -> systemDark }
+    val glass = remember { runCatching { isGlassBlurSupported() }.getOrDefault(false) }
     val scheme = if (dark) darkColorScheme(
         primary = Color(0xFFD8D8D8), secondary = Color(0xFF9EB8AA), background = Color(0xFF111318),
         surface = Color(0xFF20242B), surfaceVariant = Color(0xFF303640),
@@ -306,66 +308,46 @@ private fun MotionGuardApp(activity: MainActivity) {
     )
     val backdrop = rememberPrismalGlassLayer()
     MaterialTheme(colorScheme = scheme) {
-        Box(Modifier.fillMaxSize()) {
-            // Keep the recorded backdrop neutral; glass surfaces must not repaint the page background.
-            Box(
-                Modifier.fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
-                    .prismalGlassLayer(backdrop)
-            )
-            AnimatedContent(
-                targetState = tab,
-                modifier = Modifier.fillMaxSize(),
-                label = "main-page"
-            ) { page ->
-                if (page == 0) HomePage(activity, backdrop, Modifier.fillMaxSize())
-                else SettingsPage(activity, backdrop, Modifier.fillMaxSize())
+        GlassShell(
+            glass = glass,
+            darkTheme = dark,
+            items = listOf(
+                GlassBarItem(Icons.Rounded.Home, "首页"),
+                GlassBarItem(Icons.Rounded.Settings, "设置")
+            ),
+            selectedIndex = tab,
+            onSelect = { tab = it },
+            snackbarHost = {},
+            fallbackBar = {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+                    NavigationBarItem(
+                        selected = tab == 0,
+                        onClick = { tab = 0 },
+                        icon = { Icon(Icons.Rounded.Home, null) },
+                        label = { Text("首页") }
+                    )
+                    NavigationBarItem(
+                        selected = tab == 1,
+                        onClick = { tab = 1 },
+                        icon = { Icon(Icons.Rounded.Settings, null) },
+                        label = { Text("设置") }
+                    )
+                }
             }
-            // One glass container + plain clickable items: avoid nested tab-bar glass layers.
-            PrismalGlassSurface(
-                backdrop = backdrop,
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .fillMaxWidth().padding(horizontal = 25.dp, vertical = 13.dp),
-                shape = { PrismalRoundedRectangle(22.dp) },
-                blurRadius = 13.dp,
-                saturation = 1.15f,
-                refractionHeightPx = 8f,
-                refractionAmountPx = 10f,
-                tint = MaterialTheme.colorScheme.surface,
-                tintAlpha = if (dark) 0.48f else 0.62f
-            ) {
-                Row(
-                    Modifier.fillMaxWidth().padding(6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    listOf("首页" to Icons.Rounded.Home, "设置" to Icons.Rounded.Settings)
-                        .forEachIndexed { index, item ->
-                            val selected = tab == index
-                            Column(
-                                Modifier.weight(1f).clip(RoundedCornerShape(16.dp))
-                                    .background(
-                                        if (selected) MaterialTheme.colorScheme.primary.copy(alpha = if (dark) 0.24f else 0.14f)
-                                        else Color.Transparent
-                                    )
-                                    .clickable { tab = index }
-                                    .padding(vertical = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Icon(
-                                    item.second,
-                                    contentDescription = item.first,
-                                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Text(
-                                    item.first,
-                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-                                )
-                            }
-                        }
+        ) { padding ->
+            Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .prismalGlassLayer(backdrop)
+                )
+                AnimatedContent(
+                    targetState = tab,
+                    modifier = Modifier.fillMaxSize(),
+                    label = "main-page"
+                ) { page ->
+                    if (page == 0) HomePage(activity, backdrop, Modifier.padding(padding))
+                    else SettingsPage(activity, backdrop, Modifier.padding(padding))
                 }
             }
         }
