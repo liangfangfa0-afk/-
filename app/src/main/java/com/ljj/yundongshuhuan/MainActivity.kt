@@ -136,9 +136,9 @@ class MainActivity : ComponentActivity() {
                 // GitHub 原始地址优先；公共 CDN 作为无账号备用分发源。
                 // CDN 可能有缓存延迟，因此每次检查均按顺序尝试，且不改变清单校验规则。
                 val manifestSources = listOf(
-                    "https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json",
                     "https://cdn.jsdelivr.net/gh/liangfangfa0-afk/MotionGuard@main/ota/stable.json",
-                    "https://githubraw.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json"
+                    "https://githubraw.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json",
+                    "https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json"
                 )
                 var manifestText: String? = null
                 var lastSourceError = "没有可用的 OTA 清单源"
