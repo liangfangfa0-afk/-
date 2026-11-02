@@ -284,7 +284,7 @@ private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
                     )
                 }
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("动态粒子场", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("动态粒子场", color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     Text("MOTION CUES", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp, letterSpacing = 2.sp)
                 }
                 Text("LIVE PREVIEW", Modifier.align(Alignment.BottomStart).padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, letterSpacing = 1.5.sp)
@@ -295,14 +295,14 @@ private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(9.dp).clip(CircleShape).background(if (a.running) Color(0xFF6FA88B) else MaterialTheme.colorScheme.onSurfaceVariant))
                     Spacer(Modifier.width(9.dp))
-                    Text(if (a.running) "运行中" else "尚未启动", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(if (a.running) "运行中" else "尚未启动", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
                     Text(a.status, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 }
                 Button(
                     onClick = a::toggleMonitor, modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(17.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (a.running) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary, contentColor = if (a.running) Color.White else MaterialTheme.colorScheme.background)
+                    colors = ButtonDefaults.buttonColors(containerColor = if (a.running) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary, contentColor = if (a.running) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary)
                 ) {
                     Icon(if (a.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null)
                     Spacer(Modifier.width(8.dp))
@@ -331,7 +331,7 @@ private fun SummaryTile(title: String, value: String, icon: ImageVector, modifie
             Spacer(Modifier.width(9.dp))
             Column {
                 Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                Text(value, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(value, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             }
         }
     }
@@ -344,11 +344,11 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
             .padding(horizontal = 22.dp).padding(top = 27.dp, bottom = 120.dp),
         verticalArrangement = Arrangement.spacedBy(17.dp)
     ) {
-        Text("设置", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.Bold)
+        Text("设置", color = MaterialTheme.colorScheme.onSurface, fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Text("调整气泡反馈与应用行为", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(23.dp)) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("外观模式", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text("外观模式", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("跟随系统", "浅色", "深色").forEachIndexed { index, label ->
                         FilterChip(selected = a.themeMode == index, onClick = { a.applyThemeMode(index) }, label = { Text(label) })
@@ -363,10 +363,10 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Tune, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(10.dp))
-                    Text("运动反馈", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("运动反馈", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("灵敏度", color = Color.White)
+                    Text("灵敏度", color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.weight(1f))
                     Text(String.format(Locale.US, "%.1f×", a.sensitivity), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
@@ -380,7 +380,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Palette, null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(10.dp))
-                    Text("气泡颜色", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("气泡颜色", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Palette.forEachIndexed { index, color ->
@@ -404,7 +404,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(23.dp)) {
             Column {
                 SettingRow(Icons.Rounded.SystemUpdate, "检查更新", "查询 GitHub 版本与更新包", a::checkUpdates)
-                HorizontalDivider(color = Color.White.copy(alpha = .06f))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .06f))
                 SettingRow(Icons.Rounded.Shield, "悬浮窗权限", "管理屏幕边缘气泡显示权限") {
                     a.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${a.packageName}")))
                 }
@@ -412,7 +412,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
         }
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .72f)), shape = RoundedCornerShape(19.dp)) {
             Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("外观能力", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text("外观能力", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Text(if (glass) "Liquid Glass：AGSL 折射可用" else "Liquid Glass：当前设备将使用兼容底栏", color = if (glass) Color(0xFF6EE7B7) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 Text("版本 1.0.27", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
@@ -426,7 +426,7 @@ private fun SettingRow(icon: ImageVector, title: String, subtitle: String, onCli
         Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
         Spacer(Modifier.width(13.dp))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, color = Color.White, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium, fontSize = 14.sp)
             Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
         }
         Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
