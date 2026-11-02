@@ -1,3 +1,7 @@
 [submodule "libs/LiquidGlassBar"]
 	path = libs/LiquidGlassBar
 	url = https://github.com/wzhdgithub/LiquidGlassBar.git
+
+[submodule "prismal-upstream"]
+	path = prismal-upstream
+	url = https://github.com/styropyr0/PrismalAGSL.git

@@ -19,7 +19,7 @@
 - Android Gradle Plugin 8.13.0
 - compileSdk 37
 
-本仓库保留原有 LiquidGlassBar submodule 以兼容历史代码；当前全局液态玻璃依赖通过 JitPack 获取 PrismalAGSL v1.0.4。克隆后请使用：
+本仓库将 PrismalAGSL v1.0.4 固定为 Git submodule，并由本仓库的 `:prismal` Android Library module 直接编译其 Compose 源码，避免上游 JitPack 坐标与旧版 Prismal 仓库产物冲突。上游源码保留在 `prismal-upstream`，MIT 许可文件随 submodule 一并提供。克隆后请使用：
 
 ```bash
 git clone --recurse-submodules https://github.com/liangfangfa0-afk/MotionGuard.git
