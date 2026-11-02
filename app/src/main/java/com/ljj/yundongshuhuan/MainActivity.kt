@@ -78,6 +78,8 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
         }
+        // 启动后延迟检查一次更新，避免阻塞首屏加载。
+        Handler(Looper.getMainLooper()).postDelayed({ checkUpdates(silent = true) }, 1500)
     }
 
     override fun onStart() {
@@ -126,52 +128,71 @@ class MainActivity : ComponentActivity() {
             .putExtra(MotionMonitorService.EXTRA_COLOR, paletteIndex)
         try { startService(i) } catch (_: Exception) { }
     }
-    fun checkUpdates() {
-        Toast.makeText(this, "正在检查 GitHub 更新…", Toast.LENGTH_SHORT).show()
+    fun checkUpdates(silent: Boolean = false) {
+        if (!silent) Toast.makeText(this, "正在检查 GitHub 更新…", Toast.LENGTH_SHORT).show()
         Thread {
+            var connection: HttpURLConnection? = null
             try {
-                val connection = (URL("https://api.github.com/repos/liangfangfa0-afk/-/releases/latest").openConnection() as HttpURLConnection).apply {
+                connection = (URL("https://api.github.com/repos/liangfangfa0-afk/-/releases/latest").openConnection() as HttpURLConnection).apply {
                     connectTimeout = 12000
                     readTimeout = 12000
+                    requestMethod = "GET"
                     setRequestProperty("Accept", "application/vnd.github+json")
                     setRequestProperty("User-Agent", "MotionGuard-Android")
+                    setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+                }
+                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                    throw IllegalStateException("GitHub API HTTP ${connection.responseCode}")
                 }
                 val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                connection.disconnect()
                 val tag = json.optString("tag_name").removePrefix("v")
-                val remoteCode = tag.substringAfterLast(".").toIntOrNull() ?: 0
-                val currentCode = packageManager.getPackageInfo(packageName, 0).versionName
-                    ?.substringAfterLast(".")?.toIntOrNull() ?: 0
+                val currentVersion = packageManager.getPackageInfo(packageName, 0).versionName ?: "0.0.0"
                 val assets = json.optJSONArray("assets")
                 var apkUrl: String? = null
                 if (assets != null) for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
                     if (asset.optString("name").endsWith(".apk", true)) {
-                        apkUrl = asset.optString("browser_download_url")
+                        apkUrl = asset.optString("browser_download_url").takeIf { it.startsWith("https://") }
                         break
                     }
                 }
-                val notes = json.optString("body").ifBlank { "此版本没有提供更新说明。" }
+                val notes = json.optString("body").trim().ifBlank { "此版本暂无更新日志。" }
+                val hasUpdate = compareVersions(tag, currentVersion) > 0
                 Handler(Looper.getMainLooper()).post {
-                    if (remoteCode <= currentCode) {
-                        Toast.makeText(this, "当前已是最新版本", Toast.LENGTH_LONG).show()
-                    } else if (apkUrl.isNullOrBlank()) {
-                        Toast.makeText(this, "发现 $tag，但 Release 中没有 APK", Toast.LENGTH_LONG).show()
-                    } else {
+                    if (hasUpdate && !apkUrl.isNullOrBlank()) {
                         android.app.AlertDialog.Builder(this)
-                            .setTitle("发现新版本 $tag")
-                            .setMessage(notes.take(1200))
-                            .setNegativeButton("稍后", null)
-                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(apkUrl!!) }
+                            .setTitle("发现新版本  v$tag")
+                            .setMessage("当前版本：v$currentVersion\n最新版本：v$tag\n\n更新日志\n$notes".take(6000))
+                            .setNegativeButton("稍后更新", null)
+                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(apkUrl) }
+                            .setCancelable(true)
                             .show()
+                    } else if (!silent) {
+                        val message = if (hasUpdate) "发现 v$tag，但云端 Release 尚未上传 APK" else "当前已是最新版本（v$currentVersion）"
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(this, "检查更新失败：网络不可用或暂未发布 Release", Toast.LENGTH_LONG).show()
+                    if (!silent) Toast.makeText(this, "检查更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
                 }
+            } finally {
+                connection?.disconnect()
             }
         }.start()
+    }
+
+    private fun compareVersions(remote: String, current: String): Int {
+        fun parts(value: String) = value.trim().removePrefix("v")
+            .substringBefore("-").split(".").map { it.toIntOrNull() ?: 0 }
+        val a = parts(remote)
+        val b = parts(current)
+        for (i in 0 until maxOf(a.size, b.size)) {
+            val left = a.getOrElse(i) { 0 }
+            val right = b.getOrElse(i) { 0 }
+            if (left != right) return left.compareTo(right)
+        }
+        return 0
     }
 
     private fun downloadAndInstall(url: String) {
@@ -414,7 +435,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
             Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("外观能力", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Text(if (glass) "Liquid Glass：AGSL 折射可用" else "Liquid Glass：当前设备将使用兼容底栏", color = if (glass) Color(0xFF6EE7B7) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                Text("版本 1.0.27", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                Text("版本 ${a.packageManager.getPackageInfo(a.packageName, 0).versionName ?: "未知"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
             }
         }
     }
