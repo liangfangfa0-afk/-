@@ -52,7 +52,7 @@ private val PaletteNames = listOf("雾灰", "鼠尾草", "灰紫", "砂金")
 class MainActivity : ComponentActivity() {
     var status by mutableStateOf("准备就绪"); private set
     var running by mutableStateOf(false); private set
-    var sensitivity by mutableFloatStateOf(1.8f); private set
+    var sensitivity by mutableFloatStateOf(4.0f); private set
     var paletteIndex by mutableIntStateOf(0); private set
     var themeMode by mutableIntStateOf(0); private set
     private var receiverRegistered = false
@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("yundongshuhuan", MODE_PRIVATE)
-        sensitivity = prefs.getFloat("sensitivity", 1.8f).coerceIn(0.6f, 3.5f)
+        sensitivity = prefs.getFloat("sensitivity", 4.0f).coerceIn(0.6f, 4.0f)
         paletteIndex = prefs.getInt("bubble_color", 0).coerceIn(0, 3)
         themeMode = prefs.getInt("theme_mode", 0).coerceIn(0, 2)
         running = prefs.getBoolean("running", false)
@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
         getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit().putInt("theme_mode", themeMode).apply()
     }
     fun updateConfig(sensitivityValue: Float = sensitivity, colorValue: Int = paletteIndex) {
-        sensitivity = sensitivityValue.coerceIn(0.6f, 3.5f)
+        sensitivity = sensitivityValue.coerceIn(0.6f, 4.0f)
         paletteIndex = colorValue.coerceIn(0, 3)
         getSharedPreferences("yundongshuhuan", MODE_PRIVATE).edit()
             .putFloat("sensitivity", sensitivity).putInt("bubble_color", paletteIndex).apply()
@@ -392,7 +392,7 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
                     Spacer(Modifier.weight(1f))
                     Text(String.format(Locale.US, "%.1f×", a.sensitivity), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
-                Slider(value = a.sensitivity, onValueChange = { a.updateConfig(sensitivityValue = it) }, valueRange = .6f..3.5f)
+                Slider(value = a.sensitivity, onValueChange = { a.updateConfig(sensitivityValue = it) }, valueRange = .6f..4.0f)
                 Text("数值越高，气泡对设备运动的响应越明显。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
@@ -433,10 +433,17 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
             }
         }
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .72f)), shape = RoundedCornerShape(19.dp)) {
-            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("外观能力", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Text(if (glass) "Liquid Glass：AGSL 折射可用" else "Liquid Glass：当前设备将使用兼容底栏", color = if (glass) Color(0xFF6EE7B7) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                 Text("版本 ${a.packageManager.getPackageInfo(a.packageName, 0).versionName ?: "未知"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
+                Text("开源许可与第三方声明", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                Text("本应用按 GNU GPL-3.0-or-later 发布。液态玻璃底栏采用 LiquidGlassBar（GPL-3.0-or-later），其实现包含来自 KernelSU 的 GPL 组件，并使用 AndroidLiquidGlass 与 Miuix 的 Apache-2.0 组件。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("LiquidGlassBar 项目与完整第三方版权、许可清单", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
+                    modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/wzhdgithub/LiquidGlassBar"))) })
+                Text("本应用源码及 GPL-3.0 许可", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
+                    modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/liangfangfa0-afk/-"))) })
             }
         }
     }
