@@ -235,6 +235,11 @@ class MainActivity : ComponentActivity() {
                     instanceFollowRedirects = true
                     setRequestProperty("User-Agent", "MotionGuard-Android")
                 }
+                val responseCode = connection.responseCode
+                if (responseCode != HttpURLConnection.HTTP_OK) {
+                    connection.disconnect()
+                    throw IllegalStateException("APK 下载 HTTP $responseCode")
+                }
                 val directory = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
                 val apk = File(directory, "motionguard-update.apk")
                 connection.inputStream.use { input ->
