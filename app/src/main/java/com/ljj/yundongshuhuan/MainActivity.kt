@@ -365,7 +365,7 @@ private fun GlassPanel(
     backdrop: PrismalGlassLayer,
     modifier: Modifier = Modifier,
     radius: androidx.compose.ui.unit.Dp = 24.dp,
-    content: @Composable androidx.compose.ui.layout.BoxScope.() -> Unit
+    content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit
 ) {
     PrismalGlassSurface(
         backdrop = backdrop,
