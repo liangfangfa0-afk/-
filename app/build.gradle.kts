@@ -31,5 +31,5 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("com.github.styropyr0.PrismalAGSL:Prismal:v1.0.4")
+    implementation("com.github.styropyr0:PrismalAGSL:Prismal:v1.0.4")
 }
