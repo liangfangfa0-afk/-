@@ -4,31 +4,51 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Release tag, for example v1.0.27"
+        required: true
+        type: string
+      source_run_id:
+        description: "Successful Android build run ID whose APK should be published"
+        required: true
+        type: string
+      target_commitish:
+        description: "Commit that the release tag should point to"
+        required: true
+        default: "10d3cc3d867e5d44165e7487f0077b8b620e6f9e"
+        type: string
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
+        if: github.event_name == 'push'
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Set up JDK
+        if: github.event_name == 'push'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "24"
 
       - name: Set up Gradle
+        if: github.event_name == 'push'
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.14.4"
 
       - name: Verify tag matches app version
+        if: github.event_name == 'push'
         shell: bash
         run: |
           APP_VERSION=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | cut -d '"' -f 2)
@@ -39,19 +59,43 @@ jobs:
           fi
 
       - name: Build APK once
+        if: github.event_name == 'push'
         run: gradle :app:assembleDebug
+
+      - name: Download an existing successful build artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          name: yundongshuhuan-debug
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifact-download
+          merge-multiple: true
 
       - name: Prepare release asset
         shell: bash
+        env:
+          RELEASE_TAG_INPUT: ${{ inputs.tag_name }}
         run: |
           mkdir -p release
-          cp app/build/outputs/apk/debug/app-debug.apk "release/MotionGuard-${GITHUB_REF_NAME}.apk"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            APK_SOURCE="artifact-download/app-debug.apk"
+            RELEASE_TAG="$RELEASE_TAG_INPUT"
+          else
+            APK_SOURCE="app/build/outputs/apk/debug/app-debug.apk"
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          fi
+          test -s "$APK_SOURCE"
+          cp "$APK_SOURCE" "release/MotionGuard-${RELEASE_TAG}.apk"
           sha256sum release/*.apk > release/SHA256SUMS.txt
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: MotionGuard ${{ github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ inputs.target_commitish }}
+          name: MotionGuard ${{ env.RELEASE_TAG }}
           generate_release_notes: true
           files: |
             release/*.apk
