@@ -207,8 +207,6 @@ class MainActivity : ComponentActivity() {
                 Handler(Looper.getMainLooper()).post {
                     if (!silent) Toast.makeText(this, "检查 OTA 更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
                 }
-            } finally {
-                connection?.disconnect()
             }
         }.start()
     }
