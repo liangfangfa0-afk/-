@@ -1,12 +1,12 @@
 {
   "appId": "com.ljj.yundongshuhuan",
-  "versionCode": 32,
-  "versionName": "1.0.32",
-  "releaseNotes": "MotionGuard v1.0.32 正式版。包含液态玻璃界面、传感器气泡提示与 OTA 更新流程。",
+  "versionCode": 33,
+  "versionName": "1.0.33",
+  "releaseNotes": "MotionGuard v1.0.33 正式版。更新全局液态玻璃界面，采用固定版本的 PrismalAGSL Compose 源码模块，并保留传感器气泡提示与 OTA 更新流程。",
   "mandatory": false,
   "minimumSupportedVersionCode": 1,
   "apk": {
-    "url": "https://github.com/liangfangfa0-afk/MotionGuard/releases/download/v1.0.32/MotionGuard-v1.0.32.apk",
-    "sha256": "7e00e93b71654fb0168e367b8acc6e18bcabb8e6d2fba1f8c9e327953c34be63"
+    "url": "https://github.com/liangfangfa0-afk/MotionGuard/releases/download/v1.0.33/MotionGuard-v1.0.33.apk",
+    "sha256": "bb516a59d60dbc86f331ea3bb85baef523c482aba864bf58b3a90789340e0a20"
   }
 }
