@@ -60,7 +60,8 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
                 alpha = 0.28f + random.nextFloat() * 0.42f,
                 driftX = (random.nextFloat() - 0.5f) * dp(8f),
                 driftY = (random.nextFloat() - 0.5f) * dp(8f),
-                phase = random.nextFloat() * 6.28f,\n                sizeAmplitude = 0.18f + random.nextFloat() * 0.30f
+                phase = random.nextFloat() * 6.28f,
+                sizeAmplitude = 0.18f + random.nextFloat() * 0.30f
             )
         }
         fieldWidth = w
@@ -103,7 +104,8 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             val pulse = 0.88f + 0.12f * kotlin.math.sin(elapsed * 1.1f + particle.phase)
             val alpha = min(255, max(0, (particle.alpha * pulse * 255f).toInt()))
             fill.color = (color and 0x00FFFFFF) or (alpha shl 24)
-            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.35f + particle.phase)\n            canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
+            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.35f + particle.phase)
+            canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
         }
         postInvalidateOnAnimation()
     }
