@@ -13,7 +13,11 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float
     )
 
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        alpha = 255
+    }
+    private companion object { const val FRAME_INTERVAL_MS = 22L }
     private val particles = ArrayList<Particle>()
     private var fieldWidth = 0f
     private var fieldHeight = 0f
@@ -33,14 +37,14 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     fun setStyle(value: Float, palette: Int) {
         sensitivity = value.coerceIn(0.6f, 4.0f)
         paletteIndex = palette.coerceIn(0, 3)
-        postInvalidateOnAnimation()
+        invalidate()
     }
 
     fun updateMotion(x: Float, y: Float, magnitude: Float) {
         val gain = sensitivity / 1.8f
         targetX = (-x / 3.2f * gain).coerceIn(-1.4f, 1.4f)
         targetY = (y / 3.2f * gain).coerceIn(-1.4f, 1.4f)
-        postInvalidateOnAnimation()
+        // The draw loop is frame-capped; sensor events only update the latest target.
     }
 
     private fun seedParticles(w: Float, h: Float) {
@@ -102,7 +106,7 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.35f + particle.phase)
             canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
         }
-        postInvalidateOnAnimation()
+        postInvalidateDelayed(FRAME_INTERVAL_MS)
     }
 
     private fun dp(value: Float) = value * resources.displayMetrics.density

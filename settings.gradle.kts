@@ -7,4 +7,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "MotionGuard"
 include(":app", ":prismal", ":liquidglass")
-project(":liquidglass").projectDir = file("libs/LiquidGlassBar/liquidglass")
+project(":liquidglass").projectDir = file("liquidglass")
