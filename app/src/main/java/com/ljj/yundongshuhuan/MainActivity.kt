@@ -5,19 +5,8 @@ import androidx.activity.ComponentActivity
 import android.content.*
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import android.os.Environment
-import androidx.core.content.FileProvider
-import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.security.MessageDigest
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -57,21 +46,9 @@ import com.styropyr0.prismal.components.PrismalGlassSlider
 import com.styropyr0.prismal.components.PrismalGlassToggle
 import com.styropyr0.prismal.shapes.PrismalRoundedRectangle
 import io.github.wzhdgithub.liquidglass.*
-import java.util.Locale
 
 private val Palette = listOf(Color(0xFFB8B8B8), Color(0xFF82B7A0), Color(0xFFAA9AC8), Color(0xFFD0A36D))
 private val PaletteNames = listOf("雾灰", "鼠尾草", "灰紫", "砂金")
-
-data class UpdatePrompt(
-    val versionTag: String,
-    val currentVersion: String,
-    val currentCode: Long,
-    val remoteCode: Long,
-    val releaseNotes: String,
-    val mandatory: Boolean,
-    val downloadUrl: String,
-    val sha256: String
-)
 
 class MainActivity : ComponentActivity() {
     var status by mutableStateOf("准备就绪"); private set
@@ -79,7 +56,7 @@ class MainActivity : ComponentActivity() {
     var sensitivity by mutableFloatStateOf(4.0f); private set
     var paletteIndex by mutableIntStateOf(0); private set
     var themeMode by mutableIntStateOf(0); private set
-    var pendingUpdate by mutableStateOf<UpdatePrompt?>(null)
+    var showDownloadDialog by mutableStateOf(false)
     private var receiverRegistered = false
     private var waitingPermission = false
 
@@ -103,8 +80,6 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
         }
-        // 启动后延迟检查一次更新，避免阻塞首屏加载。
-        Handler(Looper.getMainLooper()).postDelayed({ checkUpdates(silent = true) }, 1500)
     }
 
     override fun onStart() {
@@ -153,194 +128,9 @@ class MainActivity : ComponentActivity() {
             .putExtra(MotionMonitorService.EXTRA_COLOR, paletteIndex)
         try { startService(i) } catch (_: Exception) { }
     }
-    fun checkUpdates(silent: Boolean = false) {
-        if (!silent) Toast.makeText(this, "正在检查 OTA 更新…", Toast.LENGTH_SHORT).show()
-        Thread {
-            try {
-                // 每次检查都请求全部来源，避免第一个 CDN 的旧缓存遮蔽更新版本。
-                val manifestSources = listOf(
-                    "https://cdn.jsdelivr.net/gh/liangfangfa0-afk/MotionGuard@main/ota/stable.json",
-                    "https://githubraw.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json",
-                    "https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json"
-                )
-                val candidates = mutableListOf<Pair<JSONObject, Int>>()
-                val sourceErrors = mutableListOf<String>()
-                val refreshToken = System.currentTimeMillis()
-
-                manifestSources.forEachIndexed { index, source ->
-                    var connection: HttpURLConnection? = null
-                    try {
-                        val separator = if (source.contains("?")) "&" else "?"
-                        val requestUrl = URL("$source${separator}mg_refresh=${refreshToken}_$index")
-                        connection = (requestUrl.openConnection() as HttpURLConnection).apply {
-                            connectTimeout = 8000
-                            readTimeout = 12000
-                            requestMethod = "GET"
-                            instanceFollowRedirects = true
-                            useCaches = false
-                            setRequestProperty("Accept", "application/json")
-                            setRequestProperty("User-Agent", "MotionGuard-Android")
-                            setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0")
-                            setRequestProperty("Pragma", "no-cache")
-                        }
-
-                        val response = connection.responseCode
-                        if (response != HttpURLConnection.HTTP_OK) {
-                            val detail = "$source -> HTTP $response"
-                            sourceErrors += detail
-                            Log.w("MotionGuardOTA", detail)
-                            return@forEachIndexed
-                        }
-
-                        val body = connection.inputStream.bufferedReader().use { it.readText() }
-                        require(body.isNotBlank()) { "清单内容为空" }
-                        val manifest = JSONObject(body)
-                        require(manifest.optString("appId") == packageName) { "应用标识不匹配" }
-
-                        val remoteCode = manifest.optLong("versionCode", -1L)
-                        require(remoteCode > 0L) { "versionCode 无效" }
-
-                        val apk = manifest.optJSONObject("apk")
-                            ?: throw IllegalArgumentException("缺少 apk 对象")
-                        val downloadUrl = apk.optString("url")
-                        val sha256 = apk.optString("sha256").lowercase(Locale.ROOT)
-                        require(downloadUrl.startsWith("https://")) { "APK 地址不是 HTTPS" }
-                        require(sha256.matches(Regex("[a-f0-9]{64}"))) { "APK SHA-256 格式无效" }
-                        require(manifest.optString("versionName").isNotBlank()) { "versionName 缺失" }
-
-                        candidates += manifest to index
-                        Log.i("MotionGuardOTA", "source=$source status=$response versionCode=$remoteCode valid=true")
-                    } catch (sourceError: Exception) {
-                        val detail = "$source -> ${sourceError.message ?: sourceError.javaClass.simpleName}"
-                        sourceErrors += detail
-                        Log.w("MotionGuardOTA", detail, sourceError)
-                    } finally {
-                        connection?.disconnect()
-                    }
-                }
-
-                // 以所有有效来源中 versionCode 最高者为准；同版本时优先使用列表靠后的 GitHub 原始源。
-                val selected = candidates.maxWithOrNull(
-                    compareBy<Pair<JSONObject, Int>> { it.first.optLong("versionCode", -1L) }
-                        .thenBy { it.second }
-                ) ?: throw IllegalStateException(
-                    "所有 OTA 清单源均不可用：${sourceErrors.joinToString("；").take(1200)}"
-                )
-
-                val manifest = selected.first
-                val remoteCode = manifest.optLong("versionCode", -1L)
-                val currentInfo = packageManager.getPackageInfo(packageName, 0)
-                val currentCode = if (Build.VERSION.SDK_INT >= 28) currentInfo.longVersionCode else currentInfo.versionCode.toLong()
-                val currentVersion = currentInfo.versionName ?: "未知"
-                val tag = manifest.optString("versionName", "未知")
-                val apk = manifest.getJSONObject("apk")
-                val downloadUrl = apk.getString("url")
-                val sha256 = apk.getString("sha256").lowercase(Locale.ROOT)
-                val notes = manifest.optString("releaseNotes").trim().ifBlank { "此版本暂无更新日志。" }
-                val mandatory = manifest.optBoolean("mandatory", false)
-                val minimumCode = manifest.optLong("minimumSupportedVersionCode", 1L)
-                val hasUpdate = remoteCode > currentCode
-
-                Log.i(
-                    "MotionGuardOTA",
-                    "selectedSourceIndex=${selected.second} remoteCode=$remoteCode currentCode=$currentCode validSources=${candidates.size}/${manifestSources.size}"
-                )
-
-                Handler(Looper.getMainLooper()).post {
-                    if (hasUpdate) {
-                        pendingUpdate = UpdatePrompt(
-                            versionTag = tag,
-                            currentVersion = currentVersion,
-                            currentCode = currentCode,
-                            remoteCode = remoteCode,
-                            releaseNotes = notes,
-                            mandatory = mandatory,
-                            downloadUrl = downloadUrl,
-                            sha256 = sha256
-                        )
-                    } else if (!silent) {
-                        val message = if (currentCode < minimumCode) "当前版本已低于最低支持版本，请联系项目维护者" else "当前已是最新版本（v$currentVersion）"
-                        Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("MotionGuardOTA", "OTA 检查失败", e)
-                Handler(Looper.getMainLooper()).post {
-                    if (!silent) Toast.makeText(this, "检查 OTA 更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.start()
-    }
-
-    private fun compareVersions(remote: String, current: String): Int {
-        fun parts(value: String) = value.trim().removePrefix("v")
-            .substringBefore("-").split(".").map { it.toIntOrNull() ?: 0 }
-        val a = parts(remote)
-        val b = parts(current)
-        for (i in 0 until maxOf(a.size, b.size)) {
-            val left = a.getOrElse(i) { 0 }
-            val right = b.getOrElse(i) { 0 }
-            if (left != right) return left.compareTo(right)
-        }
-        return 0
-    }
-
-    fun downloadAndInstall(url: String, expectedSha256: String) {
-        Thread {
-            try {
-                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 15000
-                    readTimeout = 120000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "MotionGuard-Android")
-                }
-                val responseCode = connection.responseCode
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    connection.disconnect()
-                    throw IllegalStateException("APK 下载 HTTP $responseCode")
-                }
-                val directory = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
-                val apk = File(directory, "motionguard-update.apk")
-                connection.inputStream.use { input ->
-                    FileOutputStream(apk).use { output -> input.copyTo(output) }
-                }
-                connection.disconnect()
-                val digest = MessageDigest.getInstance("SHA-256")
-                val actualSha256 = apk.inputStream().use { input ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        digest.update(buffer, 0, count)
-                    }
-                    digest.digest().joinToString("") { "%02x".format(it) }
-                }
-                if (!actualSha256.equals(expectedSha256, ignoreCase = true)) {
-                    apk.delete()
-                    throw SecurityException("APK SHA-256 校验失败，已取消安装")
-                }
-                Handler(Looper.getMainLooper()).post {
-                    if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
-                        startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
-                        Toast.makeText(this, "请允许安装未知来源应用，然后重新检查更新", Toast.LENGTH_LONG).show()
-                        return@post
-                    }
-                    try {
-                        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
-                        val install = Intent(Intent.ACTION_VIEW)
-                            .setDataAndType(uri, "application/vnd.android.package-archive")
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        startActivity(install)
-                    } catch (_: Exception) {
-                        Toast.makeText(this, "无法启动系统安装器", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (_: Exception) {
-                Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(this, "APK 下载或完整性校验失败，已取消安装", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.start()
+    fun openLatestRelease() {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/liangfangfa0-afk/MotionGuard/releases/latest"))
+        startActivity(intent)
     }
 }
 
@@ -402,15 +192,14 @@ private fun MotionGuardApp(activity: MainActivity) {
                     if (page == 0) HomePage(activity, backdrop, Modifier.padding(padding), onGoSettings = { tab = 1 })
                     else SettingsPage(activity, backdrop, Modifier.padding(padding))
                 }
-                activity.pendingUpdate?.let { info ->
-                    UpdateGlassDialog(
+                if (activity.showDownloadDialog) {
+                    DownloadGlassDialog(
                         backdrop = backdrop,
-                        info = info,
-                        onDismiss = { activity.pendingUpdate = null },
-                        onConfirm = {
-                            activity.downloadAndInstall(info.downloadUrl, info.sha256)
-                            activity.pendingUpdate = null
-                        }
+                        onDownload = {
+                            activity.showDownloadDialog = false
+                            activity.openLatestRelease()
+                        },
+                        onDismiss = { activity.showDownloadDialog = false }
                     )
                 }
             }
@@ -419,22 +208,19 @@ private fun MotionGuardApp(activity: MainActivity) {
 }
 
 @Composable
-private fun UpdateGlassDialog(
+private fun DownloadGlassDialog(
     backdrop: PrismalGlassLayer,
-    info: UpdatePrompt,
-    onDismiss: () -> Unit,
-    onConfirm: () -> Unit
+    onDownload: () -> Unit,
+    onDismiss: () -> Unit
 ) {
-    // Keep the prompt in the activity composition/window so Prismal samples
-    // the same global backdrop as the rest of the app.
     backdrop.readSamplingState()
-    BackHandler(enabled = !info.mandatory, onBack = onDismiss)
+    BackHandler(onBack = onDismiss)
 
     Box(
         Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.34f))
-            .clickable(enabled = !info.mandatory, onClick = onDismiss),
+            .clickable(onClick = onDismiss),
         contentAlignment = Alignment.Center
     ) {
         GlassPanel(
@@ -453,170 +239,58 @@ private fun UpdateGlassDialog(
         ) {
             Column(
                 Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         Modifier
                             .size(44.dp)
-                            .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
-                                CircleShape
-                            ),
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Rounded.SystemUpdate,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(23.dp)
-                        )
+                        Icon(Icons.Rounded.Download, null, tint = MaterialTheme.colorScheme.primary)
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "发现新版本",
+                            "获取 MotionGuard",
                             color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 20.sp,
+                            fontSize = 19.sp,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "MOTIONGUARD  ·  SOFTWARE UPDATE",
+                            "DOWNLOAD FROM GITHUB",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 9.sp,
                             letterSpacing = 1.1.sp
                         )
                     }
-                    if (info.mandatory) {
-                        Text(
-                            "必须更新",
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier
-                                .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                                    RoundedCornerShape(20.dp)
-                                )
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
                 }
-
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(
-                            MaterialTheme.colorScheme.surface.copy(alpha = 0.30f),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(9.dp)
-                ) {
-                    Text(
-                        "v${info.versionTag}",
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 27.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "当前版本",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                "v${info.currentVersion}",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                        Icon(
-                            Icons.Rounded.ArrowForward,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 10.dp)
-                        )
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                "最新版本",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 10.sp
-                            )
-                            Text(
-                                "v${info.versionTag}",
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
-                    Text(
-                        "版本号  ${info.currentCode}  →  ${info.remoteCode}",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp
-                    )
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            "更新内容",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Spacer(Modifier.weight(1f))
-                        Text(
-                            "RELEASE NOTES",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 9.sp,
-                            letterSpacing = 0.8.sp
-                        )
-                    }
-                    Text(
-                        info.releaseNotes.take(2000),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 12.sp,
-                        lineHeight = 19.sp,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 180.dp)
-                            .verticalScroll(rememberScrollState())
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (!info.mandatory) {
-                        GlassActionButton(
-                            backdrop = backdrop,
-                            onClick = onDismiss,
-                            modifier = Modifier.weight(1f),
-                            height = 50.dp
-                        ) {
-                            Text("稍后更新", fontSize = 13.sp)
-                        }
+                Text(
+                    "前往 GitHub 最新发行版页面，选择适合设备的 APK 下载。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GlassActionButton(
+                        backdrop = backdrop,
+                        onClick = onDownload,
+                        selected = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 50.dp
+                    ) {
+                        Icon(Icons.Rounded.OpenInNew, null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text("通过 GitHub 下载", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                     }
                     GlassActionButton(
                         backdrop = backdrop,
-                        onClick = onConfirm,
-                        selected = true,
-                        modifier = Modifier.weight(1.25f),
-                        height = 50.dp
+                        onClick = onDismiss,
+                        modifier = Modifier.fillMaxWidth(),
+                        height = 48.dp
                     ) {
-                        Icon(
-                            Icons.Rounded.Download,
-                            contentDescription = null,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(
-                            "下载并安装",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text("关闭", fontSize = 13.sp)
                     }
                 }
             }
@@ -866,7 +540,7 @@ private fun SettingsPage(a: MainActivity, backdrop: PrismalGlassLayer, modifier:
         }
         GlassPanel(backdrop, Modifier.fillMaxWidth(), 21.dp) {
             Column {
-                GlassSettingRow(backdrop, Icons.Rounded.SystemUpdate, "检查更新", "查询 GitHub 版本与更新包", a::checkUpdates)
+                GlassSettingRow(backdrop, Icons.Rounded.SystemUpdate, "获取更新", "前往 GitHub 最新发行版下载 APK") { a.showDownloadDialog = true }
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
                 GlassSettingRow(backdrop, Icons.Rounded.Shield, "悬浮窗权限", "管理屏幕边缘气泡显示权限") {
                     a.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${a.packageName}")))
