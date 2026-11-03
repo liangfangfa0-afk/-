@@ -254,7 +254,7 @@ class MainActivity : ComponentActivity() {
             try {
                 val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 15000
-                    readTimeout = 30000
+                    readTimeout = 120000
                     instanceFollowRedirects = true
                     setRequestProperty("User-Agent", "MotionGuard-Android")
                 }
@@ -389,16 +389,15 @@ private fun UpdateGlassDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            dismissOnClickOutside = !info.mandatory,
-            usePlatformDefaultWidth = false
-        )
+    Box(
+        Modifier.fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.35f))
+            .clickable(enabled = !info.mandatory, onClick = onDismiss),
+        contentAlignment = Alignment.Center
     ) {
         GlassPanel(
             backdrop = backdrop,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).clickable(enabled = false, onClick = {}),
             radius = 28.dp
         ) {
             Column(Modifier.padding(22.dp)) {
