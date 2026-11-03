@@ -394,8 +394,9 @@ private fun UpdateGlassDialog(
     backdrop.readSamplingState()
     val density = androidx.compose.ui.platform.LocalDensity.current
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (!info.mandatory) onDismiss() },
         properties = DialogProperties(
+            dismissOnBackPress = !info.mandatory,
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
             dismissOnClickOutside = !info.mandatory
@@ -415,6 +416,15 @@ private fun UpdateGlassDialog(
                         backdrop = backdrop,
                         shape = { PrismalRoundedRectangle(28.dp) },
                         effects = prismalGlassEffects(density) {}
+                    )
+                    // Consume taps on the glass panel so they do not reach the
+                    // full-screen scrim and accidentally dismiss the update prompt.
+                    .clickable(
+                        interactionSource = remember {
+                            androidx.compose.foundation.interaction.MutableInteractionSource()
+                        },
+                        indication = null,
+                        onClick = {}
                     )
                     .padding(22.dp)
             ) {
