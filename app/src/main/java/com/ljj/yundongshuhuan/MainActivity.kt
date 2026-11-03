@@ -17,6 +17,7 @@ import java.net.URL
 import java.security.MessageDigest
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -156,62 +157,95 @@ class MainActivity : ComponentActivity() {
         if (!silent) Toast.makeText(this, "正在检查 OTA 更新…", Toast.LENGTH_SHORT).show()
         Thread {
             try {
-                // GitHub 原始地址优先；公共 CDN 作为无账号备用分发源。
-                // CDN 可能有缓存延迟，因此每次检查均按顺序尝试，且不改变清单校验规则。
+                // 每次检查都请求全部来源，避免第一个 CDN 的旧缓存遮蔽更新版本。
                 val manifestSources = listOf(
                     "https://cdn.jsdelivr.net/gh/liangfangfa0-afk/MotionGuard@main/ota/stable.json",
                     "https://githubraw.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json",
                     "https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json"
                 )
-                var manifestText: String? = null
-                var lastSourceError = "没有可用的 OTA 清单源"
-                for (source in manifestSources) {
-                    var sourceConnection: HttpURLConnection? = null
+                val candidates = mutableListOf<Pair<JSONObject, Int>>()
+                val sourceErrors = mutableListOf<String>()
+                val refreshToken = System.currentTimeMillis()
+
+                manifestSources.forEachIndexed { index, source ->
+                    var connection: HttpURLConnection? = null
                     try {
-                        sourceConnection = (URL(source).openConnection() as HttpURLConnection).apply {
+                        val separator = if (source.contains("?")) "&" else "?"
+                        val requestUrl = URL("$source\${separator}mg_refresh=\${refreshToken}_$index")
+                        connection = (requestUrl.openConnection() as HttpURLConnection).apply {
                             connectTimeout = 8000
                             readTimeout = 12000
                             requestMethod = "GET"
                             instanceFollowRedirects = true
+                            useCaches = false
                             setRequestProperty("Accept", "application/json")
                             setRequestProperty("User-Agent", "MotionGuard-Android")
-                            setRequestProperty("Cache-Control", "no-cache")
+                            setRequestProperty("Cache-Control", "no-cache, no-store, max-age=0")
+                            setRequestProperty("Pragma", "no-cache")
                         }
-                        val response = sourceConnection.responseCode
+
+                        val response = connection.responseCode
                         if (response != HttpURLConnection.HTTP_OK) {
-                            lastSourceError = "清单源 HTTP $response"
-                            continue
+                            val detail = "$source -> HTTP $response"
+                            sourceErrors += detail
+                            Log.w("MotionGuardOTA", detail)
+                            return@forEachIndexed
                         }
-                        manifestText = sourceConnection.inputStream.bufferedReader().use { it.readText() }
-                        if (manifestText.isNullOrBlank()) {
-                            lastSourceError = "清单源返回空内容"
-                            manifestText = null
-                            continue
-                        }
-                        break
+
+                        val body = connection.inputStream.bufferedReader().use { it.readText() }
+                        require(body.isNotBlank()) { "清单内容为空" }
+                        val manifest = JSONObject(body)
+                        require(manifest.optString("appId") == packageName) { "应用标识不匹配" }
+
+                        val remoteCode = manifest.optLong("versionCode", -1L)
+                        require(remoteCode > 0L) { "versionCode 无效" }
+
+                        val apk = manifest.optJSONObject("apk")
+                            ?: throw IllegalArgumentException("缺少 apk 对象")
+                        val downloadUrl = apk.optString("url")
+                        val sha256 = apk.optString("sha256").lowercase(Locale.ROOT)
+                        require(downloadUrl.startsWith("https://")) { "APK 地址不是 HTTPS" }
+                        require(sha256.matches(Regex("[a-f0-9]{64}"))) { "APK SHA-256 格式无效" }
+                        require(manifest.optString("versionName").isNotBlank()) { "versionName 缺失" }
+
+                        candidates += manifest to index
+                        Log.i("MotionGuardOTA", "source=$source status=$response versionCode=$remoteCode valid=true")
                     } catch (sourceError: Exception) {
-                        lastSourceError = sourceError.message ?: "清单源连接失败"
+                        val detail = "$source -> \${sourceError.message ?: sourceError.javaClass.simpleName}"
+                        sourceErrors += detail
+                        Log.w("MotionGuardOTA", detail, sourceError)
                     } finally {
-                        sourceConnection?.disconnect()
+                        connection?.disconnect()
                     }
                 }
-                val manifest = JSONObject(manifestText ?: throw IllegalStateException(lastSourceError))
-                require(manifest.optString("appId") == packageName) { "OTA 清单应用标识不匹配" }
+
+                // 以所有有效来源中 versionCode 最高者为准；同版本时优先使用列表靠后的 GitHub 原始源。
+                val selected = candidates.maxWithOrNull(
+                    compareBy<Pair<JSONObject, Int>> { it.first.optLong("versionCode", -1L) }
+                        .thenBy { it.second }
+                ) ?: throw IllegalStateException(
+                    "所有 OTA 清单源均不可用：\${sourceErrors.joinToString("；").take(1200)}"
+                )
+
+                val manifest = selected.first
                 val remoteCode = manifest.optLong("versionCode", -1L)
-                require(remoteCode > 0L) { "OTA 清单版本号无效" }
                 val currentInfo = packageManager.getPackageInfo(packageName, 0)
                 val currentCode = if (Build.VERSION.SDK_INT >= 28) currentInfo.longVersionCode else currentInfo.versionCode.toLong()
                 val currentVersion = currentInfo.versionName ?: "未知"
                 val tag = manifest.optString("versionName", "未知")
-                val apk = manifest.optJSONObject("apk") ?: throw IllegalStateException("OTA 清单缺少 APK 信息")
-                val downloadUrl = apk.optString("url")
-                val sha256 = apk.optString("sha256").lowercase(Locale.ROOT)
-                require(downloadUrl.startsWith("https://")) { "APK 地址必须使用 HTTPS" }
-                require(sha256.matches(Regex("[a-f0-9]{64}"))) { "APK SHA-256 格式无效" }
+                val apk = manifest.getJSONObject("apk")
+                val downloadUrl = apk.getString("url")
+                val sha256 = apk.getString("sha256").lowercase(Locale.ROOT)
                 val notes = manifest.optString("releaseNotes").trim().ifBlank { "此版本暂无更新日志。" }
                 val mandatory = manifest.optBoolean("mandatory", false)
                 val minimumCode = manifest.optLong("minimumSupportedVersionCode", 1L)
                 val hasUpdate = remoteCode > currentCode
+
+                Log.i(
+                    "MotionGuardOTA",
+                    "selectedSourceIndex=\${selected.second} remoteCode=$remoteCode currentCode=$currentCode validSources=\${candidates.size}/\${manifestSources.size}"
+                )
+
                 Handler(Looper.getMainLooper()).post {
                     if (hasUpdate) {
                         pendingUpdate = UpdatePrompt(
@@ -230,8 +264,9 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             } catch (e: Exception) {
+                Log.e("MotionGuardOTA", "OTA 检查失败", e)
                 Handler(Looper.getMainLooper()).post {
-                    if (!silent) Toast.makeText(this, "检查 OTA 更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
+                    if (!silent) Toast.makeText(this, "检查 OTA 更新失败：\${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
