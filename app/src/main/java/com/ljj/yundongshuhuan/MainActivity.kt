@@ -44,6 +44,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.styropyr0.prismal.PrismalGlassSurface
 import com.styropyr0.prismal.sources.PrismalGlassLayer
 import com.styropyr0.prismal.sources.prismalGlassLayer
@@ -58,12 +60,24 @@ import java.util.Locale
 private val Palette = listOf(Color(0xFFB8B8B8), Color(0xFF82B7A0), Color(0xFFAA9AC8), Color(0xFFD0A36D))
 private val PaletteNames = listOf("雾灰", "鼠尾草", "灰紫", "砂金")
 
+data class UpdatePrompt(
+    val versionTag: String,
+    val currentVersion: String,
+    val currentCode: Long,
+    val remoteCode: Long,
+    val releaseNotes: String,
+    val mandatory: Boolean,
+    val downloadUrl: String,
+    val sha256: String
+)
+
 class MainActivity : ComponentActivity() {
     var status by mutableStateOf("准备就绪"); private set
     var running by mutableStateOf(false); private set
     var sensitivity by mutableFloatStateOf(4.0f); private set
     var paletteIndex by mutableIntStateOf(0); private set
     var themeMode by mutableIntStateOf(0); private set
+    var pendingUpdate by mutableStateOf<UpdatePrompt?>(null)
     private var receiverRegistered = false
     private var waitingPermission = false
 
@@ -199,16 +213,19 @@ class MainActivity : ComponentActivity() {
                 val hasUpdate = remoteCode > currentCode
                 Handler(Looper.getMainLooper()).post {
                     if (hasUpdate) {
-                        val builder = android.app.AlertDialog.Builder(this)
-                            .setTitle("发现新版本  v$tag")
-                            .setMessage("当前版本：v$currentVersion（$currentCode）\n最新版本：v$tag（$remoteCode）\n\n更新日志\n$notes".take(6000))
-                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(downloadUrl, sha256) }
-                            .setCancelable(!mandatory)
-                        if (!mandatory) builder.setNegativeButton("稍后更新", null)
-                        builder.show()
+                        pendingUpdate = UpdatePrompt(
+                            versionTag = tag,
+                            currentVersion = currentVersion,
+                            currentCode = currentCode,
+                            remoteCode = remoteCode,
+                            releaseNotes = notes,
+                            mandatory = mandatory,
+                            downloadUrl = downloadUrl,
+                            sha256 = sha256
+                        )
                     } else if (!silent) {
                         val message = if (currentCode < minimumCode) "当前版本已低于最低支持版本，请联系项目维护者" else "当前已是最新版本（v$currentVersion）"
-                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, message, Toast.LENGTH_LONG).show()
                     }
                 }
             } catch (e: Exception) {
@@ -348,6 +365,69 @@ private fun MotionGuardApp(activity: MainActivity) {
                 ) { page ->
                     if (page == 0) HomePage(activity, backdrop, Modifier.padding(padding), onGoSettings = { tab = 1 })
                     else SettingsPage(activity, backdrop, Modifier.padding(padding))
+                }
+                activity.pendingUpdate?.let { info ->
+                    UpdateGlassDialog(
+                        backdrop = backdrop,
+                        info = info,
+                        onDismiss = { activity.pendingUpdate = null },
+                        onConfirm = {
+                            activity.downloadAndInstall(info.downloadUrl, info.sha256)
+                            activity.pendingUpdate = null
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateGlassDialog(
+    backdrop: PrismalGlassLayer,
+    info: UpdatePrompt,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnClickOutside = !info.mandatory,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        GlassPanel(
+            backdrop = backdrop,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+            radius = 28.dp
+        ) {
+            Column(Modifier.padding(22.dp)) {
+                Text("发现新版本", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text("v${info.versionTag}", color = MaterialTheme.colorScheme.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "当前 v${info.currentVersion}（${info.currentCode}） → 最新 v${info.versionTag}（${info.remoteCode}）",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("更新日志", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    info.releaseNotes.take(2000),
+                    color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp,
+                    maxLines = 12,
+                    modifier = Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())
+                )
+                Spacer(Modifier.height(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!info.mandatory) {
+                        GlassActionButton(backdrop, onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                            Text("稍后更新", fontSize = 14.sp)
+                        }
+                    }
+                    GlassActionButton(backdrop, onClick = onConfirm, selected = true, modifier = Modifier.weight(1f)) {
+                        Text("下载并安装", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
