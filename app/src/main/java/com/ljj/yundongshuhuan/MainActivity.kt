@@ -346,7 +346,7 @@ private fun MotionGuardApp(activity: MainActivity) {
                     modifier = Modifier.fillMaxSize(),
                     label = "main-page"
                 ) { page ->
-                    if (page == 0) HomePage(activity, backdrop, Modifier.padding(padding))
+                    if (page == 0) HomePage(activity, backdrop, Modifier.padding(padding), onGoSettings = { tab = 1 })
                     else SettingsPage(activity, backdrop, Modifier.padding(padding))
                 }
             }
@@ -359,6 +359,7 @@ private fun GlassPanel(
     backdrop: PrismalGlassLayer,
     modifier: Modifier = Modifier,
     radius: androidx.compose.ui.unit.Dp = 24.dp,
+    onClick: (() -> Unit)? = null,
     content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit
 ) {
     val darkSurface = MaterialTheme.colorScheme.background == Color(0xFF111318)
@@ -366,10 +367,12 @@ private fun GlassPanel(
         backdrop = backdrop,
         modifier = modifier,
         shape = { PrismalRoundedRectangle(radius) },
+        onClick = onClick,
         blurRadius = 12.dp,
         saturation = 1.18f,
         refractionHeightPx = 8f,
         refractionAmountPx = 10f,
+        depthEffect = true,
         tint = MaterialTheme.colorScheme.surface,
         tintAlpha = if (darkSurface) 0.42f else 0.56f,
         content = content
@@ -432,7 +435,7 @@ private fun GlassSwitch(
 }
 
 @Composable
-private fun HomePage(a: MainActivity, backdrop: PrismalGlassLayer, modifier: Modifier = Modifier) {
+private fun HomePage(a: MainActivity, backdrop: PrismalGlassLayer, modifier: Modifier = Modifier, onGoSettings: () -> Unit = {}) {
     val accent = Palette[a.paletteIndex]
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -498,15 +501,15 @@ private fun HomePage(a: MainActivity, backdrop: PrismalGlassLayer, modifier: Mod
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SummaryTile(backdrop, "灵敏度", String.format(Locale.US, "%.1f×", a.sensitivity), Icons.Rounded.Tune, Modifier.weight(1f))
-            SummaryTile(backdrop, "气泡主题", PaletteNames[a.paletteIndex], Icons.Rounded.Palette, Modifier.weight(1f))
+            SummaryTile(backdrop, "灵敏度", String.format(Locale.US, "%.1f×", a.sensitivity), Icons.Rounded.Tune, Modifier.weight(1f), onClick = onGoSettings)
+            SummaryTile(backdrop, "气泡主题", PaletteNames[a.paletteIndex], Icons.Rounded.Palette, Modifier.weight(1f), onClick = onGoSettings)
         }
     }
 }
 
 @Composable
-private fun SummaryTile(backdrop: PrismalGlassLayer, title: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
-    GlassPanel(backdrop, modifier, 19.dp) {
+private fun SummaryTile(backdrop: PrismalGlassLayer, title: String, value: String, icon: ImageVector, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    GlassPanel(backdrop, modifier, 19.dp, onClick = onClick) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(9.dp))
