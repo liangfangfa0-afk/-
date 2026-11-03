@@ -171,7 +171,7 @@ class MainActivity : ComponentActivity() {
                     var connection: HttpURLConnection? = null
                     try {
                         val separator = if (source.contains("?")) "&" else "?"
-                        val requestUrl = URL("$source\${separator}mg_refresh=\${refreshToken}_$index")
+                        val requestUrl = URL("$source${separator}mg_refresh=${refreshToken}_$index")
                         connection = (requestUrl.openConnection() as HttpURLConnection).apply {
                             connectTimeout = 8000
                             readTimeout = 12000
@@ -211,7 +211,7 @@ class MainActivity : ComponentActivity() {
                         candidates += manifest to index
                         Log.i("MotionGuardOTA", "source=$source status=$response versionCode=$remoteCode valid=true")
                     } catch (sourceError: Exception) {
-                        val detail = "$source -> \${sourceError.message ?: sourceError.javaClass.simpleName}"
+                        val detail = "$source -> ${sourceError.message ?: sourceError.javaClass.simpleName}"
                         sourceErrors += detail
                         Log.w("MotionGuardOTA", detail, sourceError)
                     } finally {
@@ -224,7 +224,7 @@ class MainActivity : ComponentActivity() {
                     compareBy<Pair<JSONObject, Int>> { it.first.optLong("versionCode", -1L) }
                         .thenBy { it.second }
                 ) ?: throw IllegalStateException(
-                    "所有 OTA 清单源均不可用：\${sourceErrors.joinToString("；").take(1200)}"
+                    "所有 OTA 清单源均不可用：${sourceErrors.joinToString("；").take(1200)}"
                 )
 
                 val manifest = selected.first
@@ -243,7 +243,7 @@ class MainActivity : ComponentActivity() {
 
                 Log.i(
                     "MotionGuardOTA",
-                    "selectedSourceIndex=\${selected.second} remoteCode=$remoteCode currentCode=$currentCode validSources=\${candidates.size}/\${manifestSources.size}"
+                    "selectedSourceIndex=${selected.second} remoteCode=$remoteCode currentCode=$currentCode validSources=${candidates.size}/${manifestSources.size}"
                 )
 
                 Handler(Looper.getMainLooper()).post {
@@ -266,7 +266,7 @@ class MainActivity : ComponentActivity() {
             } catch (e: Exception) {
                 Log.e("MotionGuardOTA", "OTA 检查失败", e)
                 Handler(Looper.getMainLooper()).post {
-                    if (!silent) Toast.makeText(this, "检查 OTA 更新失败：\${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
+                    if (!silent) Toast.makeText(this, "检查 OTA 更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
                 }
             }
         }.start()
