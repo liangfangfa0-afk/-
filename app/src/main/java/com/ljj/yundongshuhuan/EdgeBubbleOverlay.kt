@@ -10,7 +10,7 @@ import kotlin.random.Random
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
         var x: Float, var y: Float, val radius: Float,
-        val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float
+        val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float, val speed: Float
     )
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -59,10 +59,11 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
                 x = nx.coerceIn(0.035f, 0.965f) * w,
                 y = ny.coerceIn(0.035f, 0.965f) * h,
                 radius = dp(1.2f + random.nextFloat() * 2.6f),
-                                driftX = (random.nextFloat() - 0.5f) * dp(8f),
-                driftY = (random.nextFloat() - 0.5f) * dp(8f),
+                                driftX = (random.nextFloat() - 0.5f) * dp(18f),
+                driftY = (random.nextFloat() - 0.5f) * dp(15f),
                 phase = random.nextFloat() * 6.28f,
-                sizeAmplitude = 0.18f + random.nextFloat() * 0.30f
+                sizeAmplitude = 0.12f + random.nextFloat() * 0.18f,
+                speed = 0.72f + random.nextFloat() * 0.62f
             )
         }
         fieldWidth = w
@@ -83,16 +84,17 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         lastFrameNanos = now
         elapsed += dt
 
-        val response = 1f - kotlin.math.exp(-dt * 7.5f)
+        val response = 1f - kotlin.math.exp(-dt * 4.8f)
         flowX += (targetX - flowX) * response
         flowY += (targetY - flowY) * response
-        val velocityX = flowX * dp(300f)
-        val velocityY = flowY * dp(300f)
+        val velocityX = flowX * dp(115f)
+        val velocityY = flowY * dp(115f)
         val color = palettes[paletteIndex]
 
         particles.forEach { particle ->
-            val localX = particle.driftX * kotlin.math.sin(elapsed * 0.72f + particle.phase)
-            val localY = particle.driftY * kotlin.math.cos(elapsed * 0.64f + particle.phase)
+            val wave = elapsed * particle.speed + particle.phase
+            val localX = particle.driftX * kotlin.math.sin(wave)
+            val localY = particle.driftY * kotlin.math.cos(wave * 0.83f + particle.phase * 0.35f)
             particle.x += (velocityX + localX) * dt
             particle.y += (velocityY + localY) * dt
 
@@ -103,7 +105,8 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             if (particle.y > h + margin) particle.y = -margin
 
             fill.color = color
-            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.35f + particle.phase)
+            fill.alpha = 255
+            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 0.95f + particle.phase)
             canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
         }
         postInvalidateDelayed(FRAME_INTERVAL_MS)
