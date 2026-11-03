@@ -1,7 +1,5 @@
-name: Android Build
+name: Android Build (manual only)
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,6 +22,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MotionGuard-1.0.32-debug
+          name: MotionGuard-1.0.39-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
