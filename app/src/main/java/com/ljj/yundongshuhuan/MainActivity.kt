@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -44,8 +45,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.styropyr0.prismal.PrismalGlassSurface
 import com.styropyr0.prismal.drawPrismalGlass
 import com.styropyr0.prismal.prismalGlassEffects
@@ -391,68 +390,198 @@ private fun UpdateGlassDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    // Keep the prompt in the activity composition/window so Prismal samples
+    // the same global backdrop as the rest of the app.
     backdrop.readSamplingState()
-    val density = androidx.compose.ui.platform.LocalDensity.current
-    Dialog(
-        onDismissRequest = { if (!info.mandatory) onDismiss() },
-        properties = DialogProperties(
-            dismissOnBackPress = !info.mandatory,
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-            dismissOnClickOutside = !info.mandatory
-        )
+    BackHandler(enabled = !info.mandatory, onBack = onDismiss)
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.34f))
+            .clickable(enabled = !info.mandatory, onClick = onDismiss),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            Modifier.fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.3f))
-                .clickable(enabled = !info.mandatory, onClick = onDismiss),
-            contentAlignment = Alignment.Center
+        GlassPanel(
+            backdrop = backdrop,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .clickable(
+                    interactionSource = remember {
+                        androidx.compose.foundation.interaction.MutableInteractionSource()
+                    },
+                    indication = null,
+                    onClick = {}
+                ),
+            radius = 30.dp
         ) {
             Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 28.dp)
-                    .drawPrismalGlass(
-                        backdrop = backdrop,
-                        shape = { PrismalRoundedRectangle(28.dp) },
-                        effects = prismalGlassEffects(density) {}
-                    )
-                    // Consume taps on the glass panel so they do not reach the
-                    // full-screen scrim and accidentally dismiss the update prompt.
-                    .clickable(
-                        interactionSource = remember {
-                            androidx.compose.foundation.interaction.MutableInteractionSource()
-                        },
-                        indication = null,
-                        onClick = {}
-                    )
-                    .padding(22.dp)
+                Modifier.padding(22.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text("发现新版本", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                Text("v${info.versionTag}", color = MaterialTheme.colorScheme.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "当前 v${info.currentVersion}（${info.currentCode}） → 最新 v${info.versionTag}（${info.remoteCode}）",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp
-                )
-                Spacer(Modifier.height(12.dp))
-                Text("更新日志", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    info.releaseNotes.take(2000),
-                    color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp,
-                    maxLines = 12,
-                    modifier = Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState())
-                )
-                Spacer(Modifier.height(18.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (!info.mandatory) {
-                        GlassActionButton(backdrop, onClick = onDismiss, modifier = Modifier.weight(1f)) {
-                            Text("稍后更新", fontSize = 14.sp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(44.dp)
+                            .background(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            Icons.Rounded.SystemUpdate,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(23.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "发现新版本",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "MOTIONGUARD  ·  SOFTWARE UPDATE",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 9.sp,
+                            letterSpacing = 1.1.sp
+                        )
+                    }
+                    if (info.mandatory) {
+                        Text(
+                            "必须更新",
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .background(
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            MaterialTheme.colorScheme.surface.copy(alpha = 0.30f),
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp)
+                ) {
+                    Text(
+                        "v${info.versionTag}",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 27.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "当前版本",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                "v${info.currentVersion}",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        Icon(
+                            Icons.Rounded.ArrowForward,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 10.dp)
+                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "最新版本",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                "v${info.versionTag}",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
                         }
                     }
-                    GlassActionButton(backdrop, onClick = onConfirm, selected = true, modifier = Modifier.weight(1f)) {
-                        Text("下载并安装", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "版本号  ${info.currentCode}  →  ${info.remoteCode}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 10.sp
+                    )
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "更新内容",
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Spacer(Modifier.weight(1f))
+                        Text(
+                            "RELEASE NOTES",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.8.sp
+                        )
+                    }
+                    Text(
+                        info.releaseNotes.take(2000),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp,
+                        lineHeight = 19.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 180.dp)
+                            .verticalScroll(rememberScrollState())
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!info.mandatory) {
+                        GlassActionButton(
+                            backdrop = backdrop,
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            height = 50.dp
+                        ) {
+                            Text("稍后更新", fontSize = 13.sp)
+                        }
+                    }
+                    GlassActionButton(
+                        backdrop = backdrop,
+                        onClick = onConfirm,
+                        selected = true,
+                        modifier = Modifier.weight(1.25f),
+                        height = 50.dp
+                    ) {
+                        Icon(
+                            Icons.Rounded.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "下载并安装",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
