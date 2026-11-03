@@ -47,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.styropyr0.prismal.PrismalGlassSurface
+import com.styropyr0.prismal.drawPrismalGlass
+import com.styropyr0.prismal.prismalGlassEffects
 import com.styropyr0.prismal.sources.PrismalGlassLayer
 import com.styropyr0.prismal.sources.prismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
@@ -389,18 +391,35 @@ private fun UpdateGlassDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
-    Box(
-        Modifier.fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.35f))
-            .clickable(enabled = !info.mandatory, onClick = onDismiss),
-        contentAlignment = Alignment.Center
+    backdrop.readSamplingState()
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false,
+            dismissOnClickOutside = !info.mandatory
+        )
     ) {
-        GlassPanel(
-            backdrop = backdrop,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp).clickable(enabled = false, onClick = {}),
-            radius = 28.dp
+        Box(
+            Modifier.fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f))
+                .clickable(enabled = !info.mandatory, onClick = onDismiss),
+            contentAlignment = Alignment.Center
         ) {
-            Column(Modifier.padding(22.dp)) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 28.dp)
+                    .drawPrismalGlass(
+                        backdrop = backdrop,
+                        shape = { PrismalRoundedRectangle(28.dp) },
+                        effects = prismalGlassEffects(density) {
+                            colorControls(saturation = 1.2f)
+                        }
+                    )
+                    .padding(22.dp)
+            ) {
                 Text("发现新版本", color = MaterialTheme.colorScheme.onSurface, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 Text("v${info.versionTag}", color = MaterialTheme.colorScheme.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.height(10.dp))
