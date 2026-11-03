@@ -1,12 +1,12 @@
 {
   "appId": "com.ljj.yundongshuhuan",
-  "versionCode": 37,
-  "versionName": "1.0.37",
-  "releaseNotes": "全局液态玻璃 OTA 弹窗；APK 下载超时优化。",
+  "versionCode": 39,
+  "versionName": "1.0.39",
+  "releaseNotes": "全屏液态玻璃 OTA 弹窗；APK 下载超时优化。",
   "mandatory": false,
   "minimumSupportedVersionCode": 1,
   "apk": {
-    "url": "https://github.com/liangfangfa0-afk/MotionGuard/releases/download/v1.0.37/MotionGuard-v1.0.37.apk",
-    "sha256": "0acd2399ba728f02c8bfcc8a06739a627607c50e751af1cc1d90ab6a34aaf376"
+    "url": "https://github.com/liangfangfa0-afk/MotionGuard/releases/download/v1.0.39/MotionGuard-v1.0.39.apk",
+    "sha256": "5361fe45186513c0973d18e801e8e5e0316f2374315eb288a91eb49d65137b30"
   }
 }
