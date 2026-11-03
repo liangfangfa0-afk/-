@@ -5,16 +5,6 @@ import androidx.activity.ComponentActivity
 import android.content.*
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import android.os.Environment
-import androidx.core.content.FileProvider
-import org.json.JSONObject
-import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.security.MessageDigest
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -80,7 +70,6 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
         }
         // 启动后延迟检查一次更新，避免阻塞首屏加载。
-        Handler(Looper.getMainLooper()).postDelayed({ checkUpdates(silent = true) }, 1500)
     }
 
     override fun onStart() {
@@ -128,158 +117,6 @@ class MainActivity : ComponentActivity() {
             .putExtra(MotionMonitorService.EXTRA_SENSITIVITY, sensitivity)
             .putExtra(MotionMonitorService.EXTRA_COLOR, paletteIndex)
         try { startService(i) } catch (_: Exception) { }
-    }
-    fun checkUpdates(silent: Boolean = false) {
-        if (!silent) Toast.makeText(this, "正在检查 OTA 更新…", Toast.LENGTH_SHORT).show()
-        Thread {
-            try {
-                // GitHub 原始地址优先；公共 CDN 作为无账号备用分发源。
-                // CDN 可能有缓存延迟，因此每次检查均按顺序尝试，且不改变清单校验规则。
-                val manifestSources = listOf(
-                    "https://cdn.jsdelivr.net/gh/liangfangfa0-afk/MotionGuard@main/ota/stable.json",
-                    "https://githubraw.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json",
-                    "https://raw.githubusercontent.com/liangfangfa0-afk/MotionGuard/main/ota/stable.json"
-                )
-                var manifestText: String? = null
-                var lastSourceError = "没有可用的 OTA 清单源"
-                for (source in manifestSources) {
-                    var sourceConnection: HttpURLConnection? = null
-                    try {
-                        sourceConnection = (URL(source).openConnection() as HttpURLConnection).apply {
-                            connectTimeout = 8000
-                            readTimeout = 12000
-                            requestMethod = "GET"
-                            instanceFollowRedirects = true
-                            setRequestProperty("Accept", "application/json")
-                            setRequestProperty("User-Agent", "MotionGuard-Android")
-                            setRequestProperty("Cache-Control", "no-cache")
-                        }
-                        val response = sourceConnection.responseCode
-                        if (response != HttpURLConnection.HTTP_OK) {
-                            lastSourceError = "清单源 HTTP $response"
-                            continue
-                        }
-                        manifestText = sourceConnection.inputStream.bufferedReader().use { it.readText() }
-                        if (manifestText.isNullOrBlank()) {
-                            lastSourceError = "清单源返回空内容"
-                            manifestText = null
-                            continue
-                        }
-                        break
-                    } catch (sourceError: Exception) {
-                        lastSourceError = sourceError.message ?: "清单源连接失败"
-                    } finally {
-                        sourceConnection?.disconnect()
-                    }
-                }
-                val manifest = JSONObject(manifestText ?: throw IllegalStateException(lastSourceError))
-                require(manifest.optString("appId") == packageName) { "OTA 清单应用标识不匹配" }
-                val remoteCode = manifest.optLong("versionCode", -1L)
-                require(remoteCode > 0L) { "OTA 清单版本号无效" }
-                val currentInfo = packageManager.getPackageInfo(packageName, 0)
-                val currentCode = if (Build.VERSION.SDK_INT >= 28) currentInfo.longVersionCode else currentInfo.versionCode.toLong()
-                val currentVersion = currentInfo.versionName ?: "未知"
-                val tag = manifest.optString("versionName", "未知")
-                val apk = manifest.optJSONObject("apk") ?: throw IllegalStateException("OTA 清单缺少 APK 信息")
-                val downloadUrl = apk.optString("url")
-                val sha256 = apk.optString("sha256").lowercase(Locale.ROOT)
-                require(downloadUrl.startsWith("https://")) { "APK 地址必须使用 HTTPS" }
-                require(sha256.matches(Regex("[a-f0-9]{64}"))) { "APK SHA-256 格式无效" }
-                val notes = manifest.optString("releaseNotes").trim().ifBlank { "此版本暂无更新日志。" }
-                val mandatory = manifest.optBoolean("mandatory", false)
-                val minimumCode = manifest.optLong("minimumSupportedVersionCode", 1L)
-                val hasUpdate = remoteCode > currentCode
-                Handler(Looper.getMainLooper()).post {
-                    if (hasUpdate) {
-                        val builder = android.app.AlertDialog.Builder(this)
-                            .setTitle("发现新版本  v$tag")
-                            .setMessage("当前版本：v$currentVersion（$currentCode）\n最新版本：v$tag（$remoteCode）\n\n更新日志\n$notes".take(6000))
-                            .setPositiveButton("下载并安装") { _, _ -> downloadAndInstall(downloadUrl, sha256) }
-                            .setCancelable(!mandatory)
-                        if (!mandatory) builder.setNegativeButton("稍后更新", null)
-                        builder.show()
-                    } else if (!silent) {
-                        val message = if (currentCode < minimumCode) "当前版本已低于最低支持版本，请联系项目维护者" else "当前已是最新版本（v$currentVersion）"
-                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (e: Exception) {
-                Handler(Looper.getMainLooper()).post {
-                    if (!silent) Toast.makeText(this, "检查 OTA 更新失败：${e.message ?: "网络不可用"}", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.start()
-    }
-
-    private fun compareVersions(remote: String, current: String): Int {
-        fun parts(value: String) = value.trim().removePrefix("v")
-            .substringBefore("-").split(".").map { it.toIntOrNull() ?: 0 }
-        val a = parts(remote)
-        val b = parts(current)
-        for (i in 0 until maxOf(a.size, b.size)) {
-            val left = a.getOrElse(i) { 0 }
-            val right = b.getOrElse(i) { 0 }
-            if (left != right) return left.compareTo(right)
-        }
-        return 0
-    }
-
-    private fun downloadAndInstall(url: String, expectedSha256: String) {
-        Thread {
-            try {
-                val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 15000
-                    readTimeout = 30000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", "MotionGuard-Android")
-                }
-                val responseCode = connection.responseCode
-                if (responseCode != HttpURLConnection.HTTP_OK) {
-                    connection.disconnect()
-                    throw IllegalStateException("APK 下载 HTTP $responseCode")
-                }
-                val directory = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: filesDir
-                val apk = File(directory, "motionguard-update.apk")
-                connection.inputStream.use { input ->
-                    FileOutputStream(apk).use { output -> input.copyTo(output) }
-                }
-                connection.disconnect()
-                val digest = MessageDigest.getInstance("SHA-256")
-                val actualSha256 = apk.inputStream().use { input ->
-                    val buffer = ByteArray(8192)
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        digest.update(buffer, 0, count)
-                    }
-                    digest.digest().joinToString("") { "%02x".format(it) }
-                }
-                if (!actualSha256.equals(expectedSha256, ignoreCase = true)) {
-                    apk.delete()
-                    throw SecurityException("APK SHA-256 校验失败，已取消安装")
-                }
-                Handler(Looper.getMainLooper()).post {
-                    if (android.os.Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
-                        startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")))
-                        Toast.makeText(this, "请允许安装未知来源应用，然后重新检查更新", Toast.LENGTH_LONG).show()
-                        return@post
-                    }
-                    try {
-                        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", apk)
-                        val install = Intent(Intent.ACTION_VIEW)
-                            .setDataAndType(uri, "application/vnd.android.package-archive")
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        startActivity(install)
-                    } catch (_: Exception) {
-                        Toast.makeText(this, "无法启动系统安装器", Toast.LENGTH_LONG).show()
-                    }
-                }
-            } catch (_: Exception) {
-                Handler(Looper.getMainLooper()).post {
-                    Toast.makeText(this, "APK 下载或完整性校验失败，已取消安装", Toast.LENGTH_LONG).show()
-                }
-            }
-        }.start()
     }
 }
 
@@ -472,8 +309,6 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
 
         Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(23.dp)) {
             Column {
-                SettingRow(Icons.Rounded.SystemUpdate, "检查更新", "查询 GitHub 版本与更新包", a::checkUpdates)
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .06f))
                 SettingRow(Icons.Rounded.Shield, "悬浮窗权限", "管理屏幕边缘气泡显示权限") {
                     a.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${a.packageName}")))
                 }
