@@ -10,7 +10,8 @@ import kotlin.random.Random
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
         var x: Float, var y: Float, val radius: Float,
-        val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float, val speed: Float
+        val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float,
+        val swayFrequency: Float, val speed: Float
     )
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -26,6 +27,8 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     private var targetY = 0f
     private var flowX = 0f
     private var flowY = 0f
+    private var flowVelocityX = 0f
+    private var flowVelocityY = 0f
     private var sensitivity = 4.0f
     private var paletteIndex = 0
     private var elapsed = 0f
