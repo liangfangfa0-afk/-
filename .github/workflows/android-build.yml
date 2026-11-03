@@ -1,7 +1,7 @@
 name: Android Build
 on:
   push:
-    branches: [main]
+    branches: [main, feature/global-liquid-glass]
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,6 +24,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MotionGuard-1.0.32-debug
+          name: MotionGuard-1.0.34-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
