@@ -249,7 +249,7 @@ class MainActivity : ComponentActivity() {
         return 0
     }
 
-    private fun downloadAndInstall(url: String, expectedSha256: String) {
+    fun downloadAndInstall(url: String, expectedSha256: String) {
         Thread {
             try {
                 val connection = (URL(url).openConnection() as HttpURLConnection).apply {
