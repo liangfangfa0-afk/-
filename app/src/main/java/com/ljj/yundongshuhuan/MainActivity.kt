@@ -414,9 +414,7 @@ private fun UpdateGlassDialog(
                     .drawPrismalGlass(
                         backdrop = backdrop,
                         shape = { PrismalRoundedRectangle(28.dp) },
-                        effects = prismalGlassEffects(density) {
-                            colorControls(saturation = 1.2f)
-                        }
+                        effects = prismalGlassEffects(density) {}
                     )
                     .padding(22.dp)
             ) {
