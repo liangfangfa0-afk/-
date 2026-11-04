@@ -35,6 +35,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.wzhdgithub.liquidglass.*
+import com.styropyr0.prismal.PrismalBackdrop
+import com.styropyr0.prismal.PrismalGlass
+import com.styropyr0.prismal.PrismalGlassSurface
+import com.styropyr0.prismal.components.PrismalGlassButton
+import com.styropyr0.prismal.components.PrismalGlassSlider
+import com.styropyr0.prismal.shapes.PrismalRoundedRectangle
+import com.styropyr0.prismal.sources.prismalGlassLayer
+import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import java.util.Locale
 
 private val Palette = listOf(Color(0xFFB8B8B8), Color(0xFF82B7A0), Color(0xFFAA9AC8), Color(0xFFD0A36D))
@@ -145,10 +153,22 @@ private fun MotionGuardApp(activity: MainActivity) {
                 }
             }
         ) { padding ->
-            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            val backdrop = rememberPrismalGlassLayer()
+            Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(Brush.linearGradient(
+                            if (dark) listOf(Color(0xFF10151B), Color(0xFF20252C), Color(0xFF15191F))
+                            else listOf(Color(0xFFE8EDF0), Color(0xFFF7F5F0), Color(0xFFE9E9E5))
+                        ))
+                        .prismalGlassLayer(backdrop)
+                ) {
+                    Box(Modifier.align(Alignment.TopStart).padding(start = 28.dp, top = 90.dp).size(190.dp).clip(CircleShape).background(Color(0xFF8EAFA7).copy(alpha = .18f)))
+                    Box(Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 90.dp).size(230.dp).clip(CircleShape).background(Color(0xFF9A9FC0).copy(alpha = .16f)))
+                }
                 AnimatedContent(tab, label = "main-page") { page ->
-                    if (page == 0) HomePage(activity, Modifier.padding(padding))
-                    else SettingsPage(activity, glass, Modifier.padding(padding))
+                    if (page == 0) HomePage(activity, backdrop, Modifier.padding(padding))
+                    else SettingsPage(activity, backdrop, glass, Modifier.padding(padding))
                 }
             }
         }
@@ -178,7 +198,7 @@ private fun GlassPanel(
 }
 
 @Composable
-private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
+private fun HomePage(a: MainActivity, backdrop: PrismalBackdrop, modifier: Modifier = Modifier) {
     val accent = Palette[a.paletteIndex]
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -195,8 +215,8 @@ private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
                 Icon(Icons.Rounded.Shield, null, tint = accent, modifier = Modifier.size(25.dp))
             }
         }
-        Card(shape = RoundedCornerShape(27.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-            Box(Modifier.fillMaxWidth().height(210.dp).background(Brush.linearGradient(listOf(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.background)))) {
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 27.dp) {
+            Box(Modifier.fillMaxWidth().height(210.dp)) {
                 val previewDots = listOf(
                     0.10f to 0.18f, 0.22f to 0.32f, 0.38f to 0.13f, 0.66f to 0.22f, 0.88f to 0.16f,
                     0.14f to 0.55f, 0.31f to 0.72f, 0.73f to 0.61f, 0.91f to 0.48f,
@@ -217,7 +237,7 @@ private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
                 Text("LIVE PREVIEW", Modifier.align(Alignment.BottomStart).padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 9.sp, letterSpacing = 1.5.sp)
             }
         }
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .95f)), shape = RoundedCornerShape(24.dp)) {
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 24.dp) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(9.dp).clip(CircleShape).background(if (a.running) Color(0xFF6FA88B) else MaterialTheme.colorScheme.onSurfaceVariant))
@@ -226,21 +246,25 @@ private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
                     Spacer(Modifier.weight(1f))
                     Text(a.status, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 }
-                Button(
-                    onClick = a::toggleMonitor, modifier = Modifier.fillMaxWidth().height(54.dp),
-                    shape = RoundedCornerShape(17.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = if (a.running) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary, contentColor = if (a.running) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimary)
+                PrismalGlassButton(
+                    onClick = a::toggleMonitor,
+                    backdrop = backdrop,
+                    modifier = Modifier.fillMaxWidth(),
+                    height = 54.dp,
+                    shape = { PrismalRoundedRectangle(18.dp) },
+                    tint = if (a.running) MaterialTheme.colorScheme.surfaceVariant else Palette[a.paletteIndex],
+                    tintAlpha = .28f,
+                    contentPadding = PaddingValues(horizontal = 18.dp)
                 ) {
-                    Icon(if (a.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (a.running) "停止屏幕气泡" else "开启屏幕气泡", fontWeight = FontWeight.Bold)
+                    Icon(if (a.running) Icons.Rounded.Stop else Icons.Rounded.PlayArrow, null, tint = MaterialTheme.colorScheme.onSurface)
+                    Text(if (a.running) "停止屏幕气泡" else "开启屏幕气泡", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold)
                 }
                 Text("动态气泡随设备运动流动，不拦截触摸操作。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SummaryTile("灵敏度", String.format(Locale.US, "%.1f×", a.sensitivity), Icons.Rounded.Tune, Modifier.weight(1f))
-            SummaryTile("气泡主题", PaletteNames[a.paletteIndex], Icons.Rounded.Palette, Modifier.weight(1f))
+            SummaryTile("灵敏度", String.format(Locale.US, "%.1f×", a.sensitivity), Icons.Rounded.Tune, backdrop, Modifier.weight(1f))
+            SummaryTile("气泡主题", PaletteNames[a.paletteIndex], Icons.Rounded.Palette, backdrop, Modifier.weight(1f))
         }
     }
 }
@@ -251,8 +275,8 @@ private fun BubbleDot(color: Color, size: Int) {
 }
 
 @Composable
-private fun SummaryTile(title: String, value: String, icon: ImageVector, modifier: Modifier = Modifier) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(19.dp)) {
+private fun SummaryTile(title: String, value: String, icon: ImageVector, backdrop: PrismalBackdrop, modifier: Modifier = Modifier) {
+    GlassPanel(backdrop, modifier = modifier, radius = 19.dp) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(9.dp))
@@ -265,7 +289,7 @@ private fun SummaryTile(title: String, value: String, icon: ImageVector, modifie
 }
 
 @Composable
-private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = Modifier) {
+private fun SettingsPage(a: MainActivity, backdrop: PrismalBackdrop, glass: Boolean, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp).padding(top = 27.dp, bottom = 120.dp),
@@ -273,19 +297,30 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
     ) {
         Text("设置", color = MaterialTheme.colorScheme.onSurface, fontSize = 30.sp, fontWeight = FontWeight.Bold)
         Text("调整气泡反馈与应用行为", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(23.dp)) {
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 23.dp) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text("外观模式", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("跟随系统", "浅色", "深色").forEachIndexed { index, label ->
-                        FilterChip(selected = a.themeMode == index, onClick = { a.applyThemeMode(index) }, label = { Text(label) })
+                        PrismalGlassSurface(
+                            backdrop = backdrop,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            shape = { PrismalRoundedRectangle(14.dp) },
+                            onClick = { a.applyThemeMode(index) },
+                            tint = if (a.themeMode == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                            tintAlpha = if (a.themeMode == index) .30f else .12f
+                        ) {
+                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 11.sp)
+                            }
+                        }
                     }
                 }
                 Text("不使用系统动态取色，保持中性灰阶外观。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(23.dp)) {
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 23.dp) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Tune, null, tint = MaterialTheme.colorScheme.primary)
@@ -297,12 +332,19 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
                     Spacer(Modifier.weight(1f))
                     Text(String.format(Locale.US, "%.1f×", a.sensitivity), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
-                Slider(value = a.sensitivity, onValueChange = { a.updateConfig(sensitivityValue = it) }, valueRange = .6f..4.0f)
+                PrismalGlassSlider(
+                    value = { a.sensitivity },
+                    onValueChange = { a.updateConfig(sensitivityValue = it) },
+                    valueRange = .6f..4.0f,
+                    visibilityThreshold = .01f,
+                    backdrop = backdrop,
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
+                )
                 Text("数值越高，气泡对设备运动的响应越明显。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(23.dp)) {
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 23.dp) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Palette, null, tint = MaterialTheme.colorScheme.primary)
@@ -332,17 +374,22 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
             }
         }
 
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), shape = RoundedCornerShape(23.dp)) {
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 23.dp) {
             Column {
                 SettingRow(Icons.Rounded.Shield, "悬浮窗权限", "管理屏幕边缘气泡显示权限") {
                     a.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${a.packageName}")))
                 }
             }
         }
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = .72f)), shape = RoundedCornerShape(19.dp)) {
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 19.dp) {
             Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("外观能力", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                Text(if (glass) "Liquid Glass：AGSL 折射可用" else "Liquid Glass：当前设备将使用兼容底栏", color = if (glass) Color(0xFF6EE7B7) else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text(
+                    if (PrismalGlass.supportsRefraction) "PrismalAGSL：完整折射与色散可用"
+                    else if (PrismalGlass.supportsBackdropBlur) "Prismal：背景模糊可用，折射效果按系统能力降级"
+                    else "Prismal：使用兼容磨砂玻璃效果",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp
+                )
                 Text("版本 ${a.packageManager.getPackageInfo(a.packageName, 0).versionName ?: "未知"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
                 Text("开源许可与第三方声明", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
