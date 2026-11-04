@@ -156,6 +156,28 @@ private fun MotionGuardApp(activity: MainActivity) {
 }
 
 @Composable
+private fun GlassPanel(
+    backdrop: PrismalBackdrop,
+    modifier: Modifier = Modifier,
+    radius: Dp = 24.dp,
+    content: @Composable BoxScope.() -> Unit
+) {
+    PrismalGlassSurface(
+        backdrop = backdrop,
+        modifier = modifier,
+        shape = { PrismalRoundedRectangle(radius) },
+        tint = MaterialTheme.colorScheme.surface,
+        tintAlpha = if (isSystemInDarkTheme()) .18f else .20f,
+        blurRadius = 13.dp,
+        saturation = 1.7f,
+        refractionHeightPx = 18f,
+        refractionAmountPx = 28f,
+        chromaticAberration = .10f,
+        content = content
+    )
+}
+
+@Composable
 private fun HomePage(a: MainActivity, modifier: Modifier = Modifier) {
     val accent = Palette[a.paletteIndex]
     Column(
@@ -289,17 +311,21 @@ private fun SettingsPage(a: MainActivity, glass: Boolean, modifier: Modifier = M
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Palette.forEachIndexed { index, color ->
-                        Column(
-                            Modifier.weight(1f).clip(RoundedCornerShape(13.dp))
-                                .background(if (a.paletteIndex == index) color.copy(alpha = .16f) else MaterialTheme.colorScheme.surfaceVariant)
-                                .border(1.dp, if (a.paletteIndex == index) color.copy(alpha = .8f) else Color.Transparent, RoundedCornerShape(13.dp))
-                                .clickable { a.updateConfig(colorValue = index) }.padding(vertical = 11.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        PrismalGlassSurface(
+                            backdrop = backdrop,
+                            modifier = Modifier.weight(1f).height(78.dp),
+                            shape = { PrismalRoundedRectangle(14.dp) },
+                            onClick = { a.updateConfig(colorValue = index) },
+                            tint = color,
+                            tintAlpha = if (a.paletteIndex == index) .38f else .15f,
+                            blurRadius = 8.dp
                         ) {
-                            Box(Modifier.size(18.dp).background(color, CircleShape))
-                            Spacer(Modifier.height(6.dp))
-                            Text(PaletteNames[index], color = if (a.paletteIndex == index) color else MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
-                            if (a.paletteIndex == index) Icon(Icons.Rounded.Check, null, tint = color, modifier = Modifier.size(13.dp))
+                            Column(Modifier.fillMaxSize().padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                Box(Modifier.size(18.dp).clip(CircleShape).background(color).border(1.dp, Color.White.copy(alpha = .65f), CircleShape))
+                                Spacer(Modifier.height(5.dp))
+                                Text(PaletteNames[index], color = MaterialTheme.colorScheme.onSurface, fontSize = 10.sp)
+                                if (a.paletteIndex == index) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(13.dp))
+                            }
                         }
                     }
                 }
