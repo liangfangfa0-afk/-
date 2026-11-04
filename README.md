@@ -2,7 +2,7 @@
 
 一款 Android 晕动舒缓辅助应用，通过运动传感器与悬浮视觉提示，尝试帮助用户在乘车等场景中减轻视觉与运动感受之间的不适。
 
-- 当前版本：**1.71**
+- 当前版本：**1.72**
 - 应用包名：`com.ljj.yundongshuhuan`
 - 最低 Android 版本：Android 8.0（API 26）
 - 主要能力：运动传感器读取、动态粒子气泡悬浮层、灵敏度与颜色设置
@@ -10,9 +10,9 @@
 
 ## 下载
 
-正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases/tag/v1.71) 下载 `MotionGuard-v1.71.apk`。
+正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases/tag/v1.72) 下载 `MotionGuard-v1.72.apk`。
 
-SHA-256：`e0cec14c70c0bde53ebf5846cb4f84c4675cea5be4ed0a1472a5d53b2524046d`
+SHA-256：`0476264ea63e3ba3bde1d4b18c39a8233c7879ff24630b2836f619c58aac7e86`
 
 ## 构建环境
 
