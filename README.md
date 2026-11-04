@@ -8,6 +8,12 @@
 - 主要能力：运动传感器读取、动态粒子气泡悬浮层、灵敏度与颜色设置
 - 界面使用 Jetpack Compose。全局页面表面、卡片、按钮、滑块和选项采用 [PrismalAGSL](https://github.com/styropyr0/PrismalAGSL)（MIT）实现液态玻璃；底部导航栏保留 [LiquidGlassBar](https://github.com/wzhdgithub/LiquidGlassBar)（GPL-3.0-or-later）。
 
+## 下载
+
+正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases/tag/v1.71) 下载 `MotionGuard-v1.71.apk`。
+
+SHA-256：`e0cec14c70c0bde53ebf5846cb4f84c4675cea5be4ed0a1472a5d53b2524046d`
+
 ## 构建环境
 
 - JDK 17
