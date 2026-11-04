@@ -169,7 +169,7 @@ private fun MotionGuardApp(activity: MainActivity) {
                 }
                 AnimatedContent(tab, label = "main-page") { page ->
                     if (page == 0) HomePage(activity, backdrop, Modifier.padding(padding))
-                    else SettingsPage(activity, backdrop, glass, Modifier.padding(padding))
+                    else SettingsPage(activity, backdrop, Modifier.padding(padding))
                 }
             }
         }
@@ -188,7 +188,7 @@ private fun GlassPanel(
         modifier = modifier,
         shape = { PrismalRoundedRectangle(radius) },
         tint = MaterialTheme.colorScheme.surface,
-        tintAlpha = if (isSystemInDarkTheme()) .18f else .20f,
+        tintAlpha = if (MaterialTheme.colorScheme.background == Color(0xFF151515)) .18f else .20f,
         blurRadius = 13.dp,
         saturation = 1.7f,
         refractionHeightPx = 18f,
@@ -212,8 +212,13 @@ private fun HomePage(a: MainActivity, backdrop: PrismalBackdrop, modifier: Modif
                 Text("晕动舒缓", color = MaterialTheme.colorScheme.onSurface, fontSize = 31.sp, fontWeight = FontWeight.Bold)
                 Text("让视觉拥有稳定的运动参照", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
             }
-            Box(Modifier.size(48.dp).clip(CircleShape).background(accent.copy(alpha = .14f)).border(1.dp, accent.copy(alpha = .4f), CircleShape), Alignment.Center) {
-                Icon(Icons.Rounded.Shield, null, tint = accent, modifier = Modifier.size(25.dp))
+            PrismalGlassSurface(
+                backdrop = backdrop, modifier = Modifier.size(52.dp),
+                shape = { PrismalRoundedRectangle(18.dp) }, tint = accent, tintAlpha = .22f
+            ) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Shield, null, tint = accent, modifier = Modifier.size(25.dp))
+                }
             }
         }
         GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 27.dp) {
@@ -290,7 +295,7 @@ private fun SummaryTile(title: String, value: String, icon: ImageVector, backdro
 }
 
 @Composable
-private fun SettingsPage(a: MainActivity, backdrop: PrismalBackdrop, glass: Boolean, modifier: Modifier = Modifier) {
+private fun SettingsPage(a: MainActivity, backdrop: PrismalBackdrop, modifier: Modifier = Modifier) {
     Column(
         modifier.fillMaxSize().verticalScroll(rememberScrollState())
             .padding(horizontal = 22.dp).padding(top = 27.dp, bottom = 120.dp),
@@ -394,11 +399,13 @@ private fun SettingsPage(a: MainActivity, backdrop: PrismalBackdrop, glass: Bool
                 Text("版本 ${a.packageManager.getPackageInfo(a.packageName, 0).versionName ?: "未知"}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
                 HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
                 Text("开源许可与第三方声明", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                Text("本应用按 GNU GPL-3.0-or-later 发布。液态玻璃底栏采用 LiquidGlassBar（GPL-3.0-or-later），其实现包含来自 KernelSU 的 GPL 组件，并使用 AndroidLiquidGlass 与 Miuix 的 Apache-2.0 组件。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("本应用按 GNU GPL-3.0-or-later 发布。全场景液态玻璃采用 PrismalAGSL（MIT）；底部导航继续采用 LiquidGlassBar（GPL-3.0-or-later），其 NOTICE 列明 KernelSU、AndroidLiquidGlass 与 Miuix 的第三方组件许可。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Text("PrismalAGSL 项目与 MIT 许可", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
+                    modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/styropyr0/PrismalAGSL"))) })
                 Text("LiquidGlassBar 项目与完整第三方版权、许可清单", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
                     modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/wzhdgithub/LiquidGlassBar"))) })
                 Text("本应用源码及 GPL-3.0 许可", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp,
-                    modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/liangfangfa0-afk/-"))) })
+                    modifier = Modifier.clickable { a.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/liangfangfa0-afk/MotionGuard"))) })
             }
         }
     }
