@@ -6,11 +6,12 @@ import android.graphics.Paint
 import android.view.View
 import kotlin.random.Random
 
-/** Free-moving particle field; particles are not attached to fixed screen edges. */
+/** Free-moving, fully opaque vivid particle field. */
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
         var x: Float, var y: Float, val radius: Float,
-        val driftX: Float, val driftY: Float, val phase: Float, val sizeAmplitude: Float
+        val driftX: Float, val driftY: Float, val phase: Float,
+        val sizeAmplitude: Float, val colorIndex: Int
     )
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -25,9 +26,13 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     private var sensitivity = 4.0f
     private var paletteIndex = 0
     private var elapsed = 0f
-    private val palettes = intArrayOf(
-        0xFFB8B8B8.toInt(), 0xFF82B7A0.toInt(),
-        0xFFAA9AC8.toInt(), 0xFFD0A36D.toInt()
+
+    // Every theme contains several vivid colors; each particle keeps its own color.
+    private val palettes = arrayOf(
+        intArrayOf(0xFFFF1744.toInt(), 0xFFFF9100.toInt(), 0xFFFFEA00.toInt(), 0xFF00E676.toInt(), 0xFF00B0FF.toInt(), 0xFFD500F9.toInt()),
+        intArrayOf(0xFFFF4081.toInt(), 0xFFFF6D00.toInt(), 0xFFFFD600.toInt(), 0xFFF50057.toInt(), 0xFFFF3D00.toInt(), 0xFFFFAB00.toInt()),
+        intArrayOf(0xFF00E5FF.toInt(), 0xFF2979FF.toInt(), 0xFF651FFF.toInt(), 0xFF00BFA5.toInt(), 0xFF3D5AFE.toInt(), 0xFFAA00FF.toInt()),
+        intArrayOf(0xFFC6FF00.toInt(), 0xFF00E676.toInt(), 0xFF00E5FF.toInt(), 0xFFFFEA00.toInt(), 0xFFFF4081.toInt(), 0xFF76FF03.toInt())
     )
 
     fun setStyle(value: Float, palette: Int) {
@@ -45,20 +50,23 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
 
     private fun seedParticles(w: Float, h: Float) {
         particles.clear()
-        val random = Random(2701)
-        repeat(54) {
+        val random = Random(7201)
+        repeat(54) { index ->
             val angle = random.nextFloat() * (Math.PI.toFloat() * 2f)
-            val radius = 0.28f + random.nextFloat() * 0.67f
-            val nx = 0.5f + kotlin.math.cos(angle) * radius * 0.48f
-            val ny = 0.5f + kotlin.math.sin(angle) * radius * 0.46f
+            val spread = 0.28f + random.nextFloat() * 0.67f
+            val nx = 0.5f + kotlin.math.cos(angle) * spread * 0.48f
+            val ny = 0.5f + kotlin.math.sin(angle) * spread * 0.46f
+            // Alternate small and large particles for a deliberately varied rhythm.
+            val sizeTier = if (index % 2 == 0) 0.78f else 1.38f
             particles += Particle(
                 x = nx.coerceIn(0.035f, 0.965f) * w,
                 y = ny.coerceIn(0.035f, 0.965f) * h,
-                radius = dp(1.2f + random.nextFloat() * 2.6f),
-                                driftX = (random.nextFloat() - 0.5f) * dp(8f),
-                driftY = (random.nextFloat() - 0.5f) * dp(8f),
+                radius = dp(1.8f + random.nextFloat() * 1.8f) * sizeTier,
+                driftX = (random.nextFloat() - 0.5f) * dp(10f),
+                driftY = (random.nextFloat() - 0.5f) * dp(10f),
                 phase = random.nextFloat() * 6.28f,
-                sizeAmplitude = 0.18f + random.nextFloat() * 0.30f
+                sizeAmplitude = 0.12f + random.nextFloat() * 0.12f,
+                colorIndex = random.nextInt(6)
             )
         }
         fieldWidth = w
@@ -84,7 +92,7 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         flowY += (targetY - flowY) * response
         val velocityX = flowX * dp(300f)
         val velocityY = flowY * dp(300f)
-        val color = palettes[paletteIndex]
+        val colors = palettes[paletteIndex]
 
         particles.forEach { particle ->
             val localX = particle.driftX * kotlin.math.sin(elapsed * 0.72f + particle.phase)
@@ -98,8 +106,9 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             if (particle.y < -margin) particle.y = h + margin
             if (particle.y > h + margin) particle.y = -margin
 
-            fill.color = color
-            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.35f + particle.phase)
+            // Use the full ARGB color (alpha = 255): no fading or translucency.
+            fill.color = colors[particle.colorIndex]
+            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.55f + particle.phase)
             canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
         }
         postInvalidateOnAnimation()
