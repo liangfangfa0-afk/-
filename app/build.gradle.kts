@@ -10,8 +10,8 @@ android {
         applicationId = "com.ljj.yundongshuhuan"
         minSdk = 26
         targetSdk = 35
-        versionCode = 70
-        versionName = "1.70"
+        versionCode = 71
+        versionName = "1.71"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -32,4 +32,5 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation(project(":liquidglass"))
+    implementation("com.github.styropyr0:PrismalAGSL:Prismal:v1.0.4")
 }
