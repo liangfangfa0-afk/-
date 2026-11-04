@@ -10,8 +10,8 @@ android {
         applicationId = "com.ljj.yundongshuhuan"
         minSdk = 26
         targetSdk = 35
-        versionCode = 71
-        versionName = "1.71"
+        versionCode = 72
+        versionName = "1.72"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
