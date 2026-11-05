@@ -4,18 +4,27 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
+import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.sin
 import kotlin.random.Random
 
-/** Free-moving, fully opaque vivid particle field. */
+/** Smooth, damped particle motion with one vivid opaque color per selected theme. */
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
         var x: Float, var y: Float, val radius: Float,
         val driftX: Float, val driftY: Float, val phase: Float,
-        val sizeAmplitude: Float, val colorIndex: Int
+        val sizeAmplitude: Float
     )
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val particles = ArrayList<Particle>()
+    private val colors = intArrayOf(
+        0xFF00D9FF.toInt(), // vivid cyan
+        0xFFFF6D00.toInt(), // vivid orange
+        0xFFB6FF00.toInt(), // electric lime
+        0xFFB000FF.toInt()  // electric violet
+    )
     private var fieldWidth = 0f
     private var fieldHeight = 0f
     private var lastFrameNanos = 0L
@@ -27,14 +36,6 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     private var paletteIndex = 0
     private var elapsed = 0f
 
-    // Every theme contains several vivid colors; each particle keeps its own color.
-    private val palettes = arrayOf(
-        intArrayOf(0xFFFF1744.toInt(), 0xFFFF9100.toInt(), 0xFFFFEA00.toInt(), 0xFF00E676.toInt(), 0xFF00B0FF.toInt(), 0xFFD500F9.toInt()),
-        intArrayOf(0xFFFF4081.toInt(), 0xFFFF6D00.toInt(), 0xFFFFD600.toInt(), 0xFFF50057.toInt(), 0xFFFF3D00.toInt(), 0xFFFFAB00.toInt()),
-        intArrayOf(0xFF00E5FF.toInt(), 0xFF2979FF.toInt(), 0xFF651FFF.toInt(), 0xFF00BFA5.toInt(), 0xFF3D5AFE.toInt(), 0xFFAA00FF.toInt()),
-        intArrayOf(0xFFC6FF00.toInt(), 0xFF00E676.toInt(), 0xFF00E5FF.toInt(), 0xFFFFEA00.toInt(), 0xFFFF4081.toInt(), 0xFF76FF03.toInt())
-    )
-
     fun setStyle(value: Float, palette: Int) {
         sensitivity = value.coerceIn(0.6f, 4.0f)
         paletteIndex = palette.coerceIn(0, 3)
@@ -42,31 +43,29 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     }
 
     fun updateMotion(x: Float, y: Float, magnitude: Float) {
-        val gain = sensitivity / 1.8f
-        targetX = (-x / 3.2f * gain).coerceIn(-1.4f, 1.4f)
-        targetY = (y / 3.2f * gain).coerceIn(-1.4f, 1.4f)
+        val gain = sensitivity / 2.4f
+        targetX = (-x / 5.0f * gain).coerceIn(-1.0f, 1.0f)
+        targetY = (y / 5.0f * gain).coerceIn(-1.0f, 1.0f)
         postInvalidateOnAnimation()
     }
 
     private fun seedParticles(w: Float, h: Float) {
         particles.clear()
-        val random = Random(7201)
+        val random = Random(7319)
         repeat(54) { index ->
             val angle = random.nextFloat() * (Math.PI.toFloat() * 2f)
             val spread = 0.28f + random.nextFloat() * 0.67f
-            val nx = 0.5f + kotlin.math.cos(angle) * spread * 0.48f
-            val ny = 0.5f + kotlin.math.sin(angle) * spread * 0.46f
-            // Alternate small and large particles for a deliberately varied rhythm.
+            val nx = 0.5f + cos(angle) * spread * 0.48f
+            val ny = 0.5f + sin(angle) * spread * 0.46f
             val sizeTier = if (index % 2 == 0) 0.78f else 1.38f
             particles += Particle(
                 x = nx.coerceIn(0.035f, 0.965f) * w,
                 y = ny.coerceIn(0.035f, 0.965f) * h,
-                radius = dp(1.8f + random.nextFloat() * 1.8f) * sizeTier,
-                driftX = (random.nextFloat() - 0.5f) * dp(10f),
-                driftY = (random.nextFloat() - 0.5f) * dp(10f),
+                radius = dp(2.0f + random.nextFloat() * 1.5f) * sizeTier,
+                driftX = (random.nextFloat() - 0.5f) * dp(8f),
+                driftY = (random.nextFloat() - 0.5f) * dp(8f),
                 phase = random.nextFloat() * 6.28f,
-                sizeAmplitude = 0.12f + random.nextFloat() * 0.12f,
-                colorIndex = random.nextInt(6)
+                sizeAmplitude = 0.08f + random.nextFloat() * 0.08f
             )
         }
         fieldWidth = w
@@ -87,16 +86,17 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         lastFrameNanos = now
         elapsed += dt
 
-        val response = 1f - kotlin.math.exp(-dt * 7.5f)
+        // Critically damped-style easing filters sensor jitter and avoids abrupt direction changes.
+        val response = 1f - exp(-dt * 4.2f)
         flowX += (targetX - flowX) * response
         flowY += (targetY - flowY) * response
-        val velocityX = flowX * dp(300f)
-        val velocityY = flowY * dp(300f)
-        val colors = palettes[paletteIndex]
+        val velocityX = flowX * dp(170f)
+        val velocityY = flowY * dp(170f)
+        fill.color = colors[paletteIndex] // ARGB alpha is always 255.
 
         particles.forEach { particle ->
-            val localX = particle.driftX * kotlin.math.sin(elapsed * 0.72f + particle.phase)
-            val localY = particle.driftY * kotlin.math.cos(elapsed * 0.64f + particle.phase)
+            val localX = particle.driftX * sin(elapsed * 0.55f + particle.phase)
+            val localY = particle.driftY * cos(elapsed * 0.48f + particle.phase)
             particle.x += (velocityX + localX) * dt
             particle.y += (velocityY + localY) * dt
 
@@ -106,9 +106,7 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             if (particle.y < -margin) particle.y = h + margin
             if (particle.y > h + margin) particle.y = -margin
 
-            // Use the full ARGB color (alpha = 255): no fading or translucency.
-            fill.color = colors[particle.colorIndex]
-            val sizePulse = 1f + particle.sizeAmplitude * kotlin.math.sin(elapsed * 1.55f + particle.phase)
+            val sizePulse = 1f + particle.sizeAmplitude * sin(elapsed * 1.1f + particle.phase)
             canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
         }
         postInvalidateOnAnimation()

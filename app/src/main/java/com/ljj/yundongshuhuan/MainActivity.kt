@@ -46,9 +46,8 @@ import com.styropyr0.prismal.sources.prismalGlassLayer
 import com.styropyr0.prismal.sources.rememberPrismalGlassLayer
 import java.util.Locale
 
-private val Palette = listOf(Color(0xFFFF1744), Color(0xFFFF9100), Color(0xFF2979FF), Color(0xFFC6FF00))
-private val PaletteNames = listOf("炫彩", "暖阳", "极光", "霓虹")
-private val PreviewParticleColors = listOf(Color(0xFFFF1744), Color(0xFFFF9100), Color(0xFFFFEA00), Color(0xFF00E676), Color(0xFF00B0FF), Color(0xFFD500F9))
+private val Palette = listOf(Color(0xFF00D9FF), Color(0xFFFF6D00), Color(0xFFB6FF00), Color(0xFFB000FF))
+private val PaletteNames = listOf("亮青", "烈橙", "荧光绿", "电紫")
 
 class MainActivity : ComponentActivity() {
     var status by mutableStateOf("准备就绪"); private set
@@ -234,7 +233,7 @@ private fun HomePage(a: MainActivity, backdrop: PrismalBackdrop, modifier: Modif
                     Box(
                         Modifier.offset(x = (point.first * 320f).dp, y = (point.second * 190f).dp)
                             .size((5 + i % 3 * 2).dp)
-                            .background(PreviewParticleColors[i % PreviewParticleColors.size], CircleShape)
+                            .background(accent, CircleShape)
                     )
                 }
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
