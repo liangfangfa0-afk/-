@@ -2,17 +2,17 @@
 
 一款 Android 晕动舒缓辅助应用，通过运动传感器与悬浮视觉提示，尝试帮助用户在乘车等场景中减轻视觉与运动感受之间的不适。
 
-- 当前版本：**1.72**
+- 当前版本：**1.75**
 - 应用包名：`com.ljj.yundongshuhuan`
 - 最低 Android 版本：Android 8.0（API 26）
-- 主要能力：运动传感器读取、动态粒子气泡悬浮层、灵敏度与颜色设置
+- 主要能力：运动状态检测（静止 / 正在左转 / 正在右转 / 加速 / 减速）、姿态角显示、GPS 卫星 / 网络定位信息面板、动态粒子气泡悬浮层、灵敏度与颜色设置
 - 界面使用 Jetpack Compose。全局页面表面、卡片、按钮、滑块和选项采用 [PrismalAGSL](https://github.com/styropyr0/PrismalAGSL)（MIT）实现液态玻璃；底部导航栏保留 [LiquidGlassBar](https://github.com/wzhdgithub/LiquidGlassBar)（GPL-3.0-or-later）。
 
 ## 下载
 
-正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases/tag/v1.72) 下载 `MotionGuard-v1.72.apk`。
+正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases/tag/v1.75) 下载 `MotionGuard-v1.75.apk`。
 
-SHA-256：`0476264ea63e3ba3bde1d4b18c39a8233c7879ff24630b2836f619c58aac7e86`
+SHA-256：`8e0fdfb10301cb00337895fe082e4a567eafd9f7700e10174a2f051b95737b16`
 
 ## 构建环境
 
@@ -33,4 +33,4 @@ git clone --recurse-submodules https://github.com/liangfangfa0-afk/MotionGuard.g
 
 ## 重要说明
 
-本应用是实验性辅助工具，不是医疗设备，也不保证能够预防或治疗晕动症。悬浮窗显示受 Android 系统、安全界面及厂商后台管理策略限制；用户需要自行授予悬浮窗权限。使用效果因设备与场景而异。
+本应用是实验性辅助工具，不是医疗设备，也不保证能够预防或治疗晕动症。悬浮窗显示受 Android 系统、安全界面及厂商后台管理策略限制；用户需要自行授予悬浮窗权限。定位仅用于在应用内显示定位方式、经纬度与速度，不会上传。使用效果因设备与场景而异。
