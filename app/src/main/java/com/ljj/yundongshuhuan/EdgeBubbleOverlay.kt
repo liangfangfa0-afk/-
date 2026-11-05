@@ -30,11 +30,15 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     private var lastFrameNanos = 0L
     private var targetX = 0f
     private var targetY = 0f
+    private var targetTurn = 0f
     private var flowX = 0f
     private var flowY = 0f
+    private var flowTurn = 0f
     private var sensitivity = 4.0f
     private var paletteIndex = 0
     private var elapsed = 0f
+    private var moving = true
+    private var idleAmount = 1f
 
     fun setStyle(value: Float, palette: Int) {
         sensitivity = value.coerceIn(0.6f, 4.0f)
@@ -42,10 +46,26 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         postInvalidateOnAnimation()
     }
 
-    fun updateMotion(x: Float, y: Float, magnitude: Float) {
+    /**
+     * 驱动气泡运动：
+     * - stationary：静止时气泡停止（摆动衰减到几乎不动）
+     * - 运动中：线性加速度反向（车动气泡反向），yawRate 转向驱动横向漂移
+     *   车辆左转（yawRate > 0）→ 气泡向右流动；右转 → 向左流动
+     */
+    fun updateMotion(x: Float, y: Float, magnitude: Float, yawRate: Float, stationary: Boolean) {
         val gain = sensitivity / 2.4f
-        targetX = (-x / 5.0f * gain).coerceIn(-1.0f, 1.0f)
-        targetY = (y / 5.0f * gain).coerceIn(-1.0f, 1.0f)
+        if (stationary) {
+            targetX = 0f
+            targetY = 0f
+            targetTurn = 0f
+            moving = false
+        } else {
+            val turnGain = sensitivity * 0.50f
+            targetTurn = (-yawRate * turnGain).coerceIn(-1.0f, 1.0f)
+            targetX = ((-x / 3.2f) * gain + targetTurn).coerceIn(-1.0f, 1.0f)
+            targetY = (y / 3.2f * gain).coerceIn(-1.0f, 1.0f)
+            moving = true
+        }
         postInvalidateOnAnimation()
     }
 
@@ -86,17 +106,22 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         lastFrameNanos = now
         elapsed += dt
 
+        // 静止时摆动衰减到几乎不动，运动时恢复
+        val idleTarget = if (moving) 1f else 0.05f
+        idleAmount += (idleTarget - idleAmount) * (1f - exp(-dt * 3.0f))
+
         // Critically damped-style easing filters sensor jitter and avoids abrupt direction changes.
         val response = 1f - exp(-dt * 4.2f)
         flowX += (targetX - flowX) * response
         flowY += (targetY - flowY) * response
-        val velocityX = flowX * dp(170f)
-        val velocityY = flowY * dp(170f)
+        flowTurn += (targetTurn - flowTurn) * response
+        val velocityX = (flowX + flowTurn) * dp(200f)
+        val velocityY = flowY * dp(200f)
         fill.color = colors[paletteIndex] // ARGB alpha is always 255.
 
         particles.forEach { particle ->
-            val localX = particle.driftX * sin(elapsed * 0.55f + particle.phase)
-            val localY = particle.driftY * cos(elapsed * 0.48f + particle.phase)
+            val localX = particle.driftX * sin(elapsed * 0.55f + particle.phase) * idleAmount
+            val localY = particle.driftY * cos(elapsed * 0.48f + particle.phase) * idleAmount
             particle.x += (velocityX + localX) * dt
             particle.y += (velocityY + localY) * dt
 

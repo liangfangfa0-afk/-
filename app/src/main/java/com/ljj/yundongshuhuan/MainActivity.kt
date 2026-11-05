@@ -4,6 +4,9 @@ import android.Manifest
 import androidx.activity.ComponentActivity
 import android.content.*
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -55,14 +58,45 @@ class MainActivity : ComponentActivity() {
     var sensitivity by mutableFloatStateOf(4.0f); private set
     var paletteIndex by mutableIntStateOf(0); private set
     var themeMode by mutableIntStateOf(0); private set
+    var roll by mutableFloatStateOf(0f); private set
+    var pitch by mutableFloatStateOf(0f); private set
+    var azimuth by mutableFloatStateOf(0f); private set
+    var yawRate by mutableFloatStateOf(0f); private set
+    var gpsProvider by mutableStateOf("未定位"); private set
+    var gpsLat by mutableStateOf("--"); private set
+    var gpsLng by mutableStateOf("--"); private set
+    var gpsSpeed by mutableStateOf("--"); private set
     private var receiverRegistered = false
     private var waitingPermission = false
+    private var locationManager: LocationManager? = null
+    private var locationListening = false
+
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            gpsProvider = if (location.provider == LocationManager.GPS_PROVIDER) "GPS 定位" else "网络定位"
+            gpsLat = String.format(Locale.US, "%.5f", location.latitude)
+            gpsLng = String.format(Locale.US, "%.5f", location.longitude)
+            gpsSpeed = if (location.hasSpeed())
+                String.format(Locale.US, "%.1f km/h", location.speed * 3.6f)
+            else "--"
+        }
+        override fun onProviderDisabled(provider: String) {
+            if (provider == LocationManager.GPS_PROVIDER) gpsProvider = "GPS 已关闭"
+        }
+        override fun onProviderEnabled(provider: String) {
+            gpsProvider = "定位中…"
+        }
+    }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action != MotionMonitorService.ACTION_UPDATE) return
             status = intent.getStringExtra(MotionMonitorService.EXTRA_STATUS) ?: "正在读取传感器"
             running = status != "监测已停止" && status != "传感器启动失败" && status != "设备没有可用的加速度传感器"
+            roll = intent.getFloatExtra(MotionMonitorService.EXTRA_ROLL, 0f)
+            pitch = intent.getFloatExtra(MotionMonitorService.EXTRA_PITCH, 0f)
+            azimuth = intent.getFloatExtra(MotionMonitorService.EXTRA_AZIMUTH, 0f)
+            yawRate = intent.getFloatExtra(MotionMonitorService.EXTRA_YAW_RATE, 0f)
         }
     }
 
@@ -78,6 +112,54 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
         }
+        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
+        if (hasLocationPermission()) startLocationUpdates() else {
+            requestPermissions(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
+                101
+            )
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101) {
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                startLocationUpdates()
+            } else {
+                gpsProvider = "未授权定位"
+            }
+        }
+    }
+
+    private fun hasLocationPermission() =
+        checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+    private fun startLocationUpdates() {
+        val lm = locationManager ?: return
+        if (locationListening) return
+        if (!hasLocationPermission()) return
+        try {
+            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 0f, locationListener)
+                gpsProvider = "GPS 定位中…"
+            }
+            if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 0f, locationListener)
+                if (gpsProvider == "GPS 定位中…") gpsProvider = "GPS/网络定位中…"
+            }
+            locationListening = true
+        } catch (_: SecurityException) {
+            gpsProvider = "未授权定位"
+        } catch (_: IllegalArgumentException) {
+            gpsProvider = "定位不可用"
+        }
+    }
+
+    override fun onDestroy() {
+        try { locationManager?.removeUpdates(locationListener) } catch (_: Exception) { }
+        super.onDestroy()
     }
 
     override fun onStart() {
@@ -268,9 +350,65 @@ private fun HomePage(a: MainActivity, backdrop: PrismalBackdrop, modifier: Modif
                 Text("动态气泡随设备运动流动，不拦截触摸操作。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
             }
         }
+        GlassPanel(backdrop, modifier = Modifier.fillMaxWidth(), radius = 24.dp) {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.Speed, null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(10.dp))
+                    Text("实时运动信息", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.weight(1f))
+                    Text(a.status, color = if (a.status == "静止") MaterialTheme.colorScheme.onSurfaceVariant else Palette[a.paletteIndex], fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoCell("横滚", "${a.roll.toInt()}°", backdrop, Modifier.weight(1f))
+                    InfoCell("俯仰", "${a.pitch.toInt()}°", backdrop, Modifier.weight(1f))
+                    InfoCell("方位", "${a.azimuth.toInt()}°", backdrop, Modifier.weight(1f))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (a.yawRate > 0.1f) Icons.Rounded.TurnLeft else if (a.yawRate < -0.1f) Icons.Rounded.TurnRight else Icons.Rounded.Explore, null, tint = Palette[a.paletteIndex], modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("转向角速度", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text(String.format(Locale.US, "%.2f rad/s", a.yawRate), color = MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .08f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.GpsFixed, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("定位方式", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text(a.gpsProvider, color = if (a.gpsProvider == "GPS 定位") Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoCell("纬度", a.gpsLat, backdrop, Modifier.weight(1f))
+                    InfoCell("经度", a.gpsLng, backdrop, Modifier.weight(1f))
+                    InfoCell("速度", a.gpsSpeed, backdrop, Modifier.weight(1f))
+                }
+                Text("定位由 GPS 卫星或网络提供，仅用于显示，不会上传。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp)
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             SummaryTile("灵敏度", String.format(Locale.US, "%.1f×", a.sensitivity), Icons.Rounded.Tune, backdrop, Modifier.weight(1f))
             SummaryTile("气泡主题", PaletteNames[a.paletteIndex], Icons.Rounded.Palette, backdrop, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+private fun InfoCell(title: String, value: String, backdrop: PrismalBackdrop, modifier: Modifier = Modifier) {
+    PrismalGlassSurface(
+        backdrop = backdrop,
+        modifier = modifier,
+        shape = { PrismalRoundedRectangle(14.dp) },
+        tint = MaterialTheme.colorScheme.surfaceVariant,
+        tintAlpha = .14f,
+        blurRadius = 7.dp
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 10.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(value, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
