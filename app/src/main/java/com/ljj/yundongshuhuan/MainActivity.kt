@@ -2,6 +2,7 @@ package com.ljj.yundongshuhuan
 
 import android.Manifest
 import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.*
 import android.content.pm.PackageManager
 import android.location.Location
@@ -70,6 +71,14 @@ class MainActivity : ComponentActivity() {
     private var waitingPermission = false
     private var locationManager: LocationManager? = null
     private var locationListening = false
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        if (result.values.any { it }) startLocationUpdates() else gpsProvider = "未授权定位"
+    }
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(location: Location) {
@@ -110,25 +119,13 @@ class MainActivity : ComponentActivity() {
         status = if (running) "屏幕气泡正在运行" else "准备就绪"
         setContent { MotionGuardApp(this) }
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100)
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         if (hasLocationPermission()) startLocationUpdates() else {
-            requestPermissions(
-                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
-                101
+            locationPermissionLauncher.launch(
+                arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             )
-        }
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 101) {
-            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-                startLocationUpdates()
-            } else {
-                gpsProvider = "未授权定位"
-            }
         }
     }
 
