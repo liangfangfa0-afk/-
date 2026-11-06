@@ -61,7 +61,7 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             moving = false
         } else {
             val turnGain = sensitivity * 0.50f
-            targetTurn = (-yawRate * turnGain).coerceIn(-1.0f, 1.0f)
+            targetTurn = (yawRate * turnGain).coerceIn(-1.0f, 1.0f)
             targetX = ((-x / 3.2f) * gain + targetTurn).coerceIn(-1.0f, 1.0f)
             targetY = (y / 3.2f * gain).coerceIn(-1.0f, 1.0f)
             moving = true
