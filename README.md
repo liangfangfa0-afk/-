@@ -2,17 +2,17 @@
 
 一款 Android 晕动舒缓辅助应用，通过运动传感器与悬浮视觉提示，尝试帮助用户在乘车等场景中减轻视觉与运动感受之间的不适。
 
-- 当前版本：**1.75**
+- 当前版本：**1.76**
 - 应用包名：`com.ljj.yundongshuhuan`
 - 最低 Android 版本：Android 8.0（API 26）
-- 主要能力：运动状态检测（静止 / 正在左转 / 正在右转 / 加速 / 减速）、姿态角显示、GPS 卫星 / 网络定位信息面板、动态粒子气泡悬浮层、灵敏度与颜色设置
+- 主要能力：运动状态检测（静止 / 正在左转 / 正在右转 / 加速 / 减速）、姿态角显示、GPS 卫星 / 网络定位信息面板、动态粒子气泡悬浮层（转向反向光流）、灵敏度与颜色设置
 - 界面使用 Jetpack Compose。全局页面表面、卡片、按钮、滑块和选项采用 [PrismalAGSL](https://github.com/styropyr0/PrismalAGSL)（MIT）实现液态玻璃；底部导航栏保留 [LiquidGlassBar](https://github.com/wzhdgithub/LiquidGlassBar)（GPL-3.0-or-later）。
 
 ## 下载
 
-正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases/tag/v1.75) 下载 `MotionGuard-v1.75.apk`。
+正式 APK 请前往 [GitHub Releases](https://github.com/liangfangfa0-afk/MotionGuard/releases/tag/v1.76) 下载 `MotionGuard-v1.76.apk`。
 
-SHA-256：`8e0fdfb10301cb00337895fe082e4a567eafd9f7700e10174a2f051b95737b16`
+SHA-256：`02d4918593a73961d42e3d975a67f1ae0fb45eecf0fd2ac339721804eb808f45`
 
 ## 构建环境
 
