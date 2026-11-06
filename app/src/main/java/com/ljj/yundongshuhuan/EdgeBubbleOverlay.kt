@@ -132,7 +132,7 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         val homeFollow = 1f - exp(-dt * 2.2f)
 
         particles.forEach { p ->
-            // 位置：静止收回各自一侧；运动时平滑漂移
+            // 位置：静止收回各自一侧；运动时全屏自由流动，不做半屏限制
             if (stationary) {
                 val home = if (p.side < 0) leftHomeX else rightHomeX
                 p.x += (home - p.x) * homeFollow
@@ -140,10 +140,10 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
                 p.x += velocityX * dt
             }
 
-            // 各自半屏范围
-            val minX = if (p.side < 0) 0.02f * w else 0.66f * w
-            val maxX = if (p.side < 0) 0.34f * w else 0.98f * w
-            p.x = p.x.coerceIn(minX, maxX)
+            // 出屏后从另一侧绕回，不卡在任何边界
+            val margin = p.radius * 2f
+            if (p.x < -margin) p.x = w + margin
+            if (p.x > w + margin) p.x = -margin
 
             // 纵向极缓呼吸
             p.y += p.driftY * sin(elapsed * 0.45f + p.phase) * dt * 0.5f
