@@ -9,36 +9,38 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.random.Random
 
-/** Smooth, damped particle motion with one vivid opaque color per selected theme. */
+/** 两侧常驻大气泡：左 10 右 10，不透明；静止收回两边，运动时沿方向流动。 */
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
         var x: Float, var y: Float, val radius: Float,
-        val driftX: Float, val driftY: Float, val phase: Float,
+        val side: Int,            // -1 = 左侧, +1 = 右侧
+        val driftY: Float,
+        val phase: Float,
         val sizeAmplitude: Float
     )
 
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        alpha = 255
+    }
     private val particles = ArrayList<Particle>()
     private val colors = intArrayOf(
-        0xFF00D9FF.toInt(), // vivid cyan
-        0xFFFF6D00.toInt(), // vivid orange
-        0xFFB6FF00.toInt(), // electric lime
-        0xFFB000FF.toInt()  // electric violet
+        0xFF00D9FF.toInt(),
+        0xFFFF6D00.toInt(),
+        0xFFB6FF00.toInt(),
+        0xFFB000FF.toInt()
     )
     private var fieldWidth = 0f
     private var fieldHeight = 0f
     private var lastFrameNanos = 0L
-    private var targetX = 0f
-    private var targetY = 0f
-    private var targetTurn = 0f
     private var flowX = 0f
-    private var flowY = 0f
     private var flowTurn = 0f
+    private var targetX = 0f
+    private var targetTurn = 0f
     private var sensitivity = 4.0f
     private var paletteIndex = 0
     private var elapsed = 0f
-    private var moving = true
-    private var idleAmount = 1f
+    private var stationary = false
 
     fun setStyle(value: Float, palette: Int) {
         sensitivity = value.coerceIn(0.6f, 4.0f)
@@ -46,46 +48,46 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         postInvalidateOnAnimation()
     }
 
-    /**
-     * 驱动气泡运动：
-     * - stationary：静止时气泡停止（摆动衰减到几乎不动）
-     * - 运动中：线性加速度反向（车动气泡反向），yawRate 转向驱动横向漂移
-     *   车辆左转（yawRate > 0）→ 气泡向右流动；右转 → 向左流动
-     */
-    fun updateMotion(x: Float, y: Float, magnitude: Float, yawRate: Float, stationary: Boolean) {
+    /** 车辆左转(yawRate>0)→气泡向右流；右转→向左流；静止收回两边。 */
+    fun updateMotion(x: Float, y: Float, magnitude: Float, yawRate: Float, isStationary: Boolean) {
         val gain = sensitivity / 2.4f
+        stationary = isStationary
         if (stationary) {
             targetX = 0f
-            targetY = 0f
             targetTurn = 0f
-            moving = false
         } else {
             val turnGain = sensitivity * 0.50f
             targetTurn = (yawRate * turnGain).coerceIn(-1.0f, 1.0f)
             targetX = ((-x / 3.2f) * gain + targetTurn).coerceIn(-1.0f, 1.0f)
-            targetY = (y / 3.2f * gain).coerceIn(-1.0f, 1.0f)
-            moving = true
         }
         postInvalidateOnAnimation()
     }
 
     private fun seedParticles(w: Float, h: Float) {
         particles.clear()
-        val random = Random(7319)
-        repeat(54) { index ->
-            val angle = random.nextFloat() * (Math.PI.toFloat() * 2f)
-            val spread = 0.28f + random.nextFloat() * 0.67f
-            val nx = 0.5f + cos(angle) * spread * 0.48f
-            val ny = 0.5f + sin(angle) * spread * 0.46f
-            val sizeTier = if (index % 2 == 0) 0.78f else 1.38f
+        val random = Random(42)
+        repeat(10) { i ->
+            val ty = (i + 0.5f) / 10f
             particles += Particle(
-                x = nx.coerceIn(0.035f, 0.965f) * w,
-                y = ny.coerceIn(0.035f, 0.965f) * h,
-                radius = dp(2.0f + random.nextFloat() * 1.5f) * sizeTier,
-                driftX = (random.nextFloat() - 0.5f) * dp(8f),
-                driftY = (random.nextFloat() - 0.5f) * dp(8f),
+                x = (0.04f + random.nextFloat() * 0.10f) * w,
+                y = ty * h + (random.nextFloat() - 0.5f) * dp(40f),
+                radius = dp(10f + random.nextFloat() * 8f),
+                side = -1,
+                driftY = (random.nextFloat() - 0.5f) * dp(10f),
                 phase = random.nextFloat() * 6.28f,
-                sizeAmplitude = 0.08f + random.nextFloat() * 0.08f
+                sizeAmplitude = 0.06f + random.nextFloat() * 0.06f
+            )
+        }
+        repeat(10) { i ->
+            val ty = (i + 0.5f) / 10f
+            particles += Particle(
+                x = (0.86f + random.nextFloat() * 0.10f) * w,
+                y = ty * h + (random.nextFloat() - 0.5f) * dp(40f),
+                radius = dp(10f + random.nextFloat() * 8f),
+                side = +1,
+                driftY = (random.nextFloat() - 0.5f) * dp(10f),
+                phase = random.nextFloat() * 6.28f,
+                sizeAmplitude = 0.06f + random.nextFloat() * 0.06f
             )
         }
         fieldWidth = w
@@ -106,33 +108,38 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         lastFrameNanos = now
         elapsed += dt
 
-        // 静止时摆动衰减到几乎不动，运动时恢复
-        val idleTarget = if (moving) 1f else 0.05f
-        idleAmount += (idleTarget - idleAmount) * (1f - exp(-dt * 3.0f))
-
-        // Critically damped-style easing filters sensor jitter and avoids abrupt direction changes.
         val response = 1f - exp(-dt * 4.2f)
         flowX += (targetX - flowX) * response
-        flowY += (targetY - flowY) * response
         flowTurn += (targetTurn - flowTurn) * response
-        val velocityX = (flowX + flowTurn) * dp(200f)
-        val velocityY = flowY * dp(200f)
-        fill.color = colors[paletteIndex] // ARGB alpha is always 255.
+        val velocityX = (flowX + flowTurn) * dp(220f)
 
-        particles.forEach { particle ->
-            val localX = particle.driftX * sin(elapsed * 0.55f + particle.phase) * idleAmount
-            val localY = particle.driftY * cos(elapsed * 0.48f + particle.phase) * idleAmount
-            particle.x += (velocityX + localX) * dt
-            particle.y += (velocityY + localY) * dt
+        fill.color = colors[paletteIndex]
 
-            val margin = dp(12f)
-            if (particle.x < -margin) particle.x = w + margin
-            if (particle.x > w + margin) particle.x = -margin
-            if (particle.y < -margin) particle.y = h + margin
-            if (particle.y > h + margin) particle.y = -margin
+        // 静止时两侧收敛到边缘位置；运动时沿速度场漂移但被 clamp 在各自半屏
+        val leftHomeX = 0.06f * w
+        val rightHomeX = 0.94f * w
+        val idleReturn = if (stationary) 1f - exp(-dt * 3.5f) else 0f
 
-            val sizePulse = 1f + particle.sizeAmplitude * sin(elapsed * 1.1f + particle.phase)
-            canvas.drawCircle(particle.x, particle.y, particle.radius * sizePulse, fill)
+        particles.forEach { p ->
+            // 静止时：往 home 位置收
+            if (stationary) {
+                val home = if (p.side < 0) leftHomeX else rightHomeX
+                p.x += (home - p.x) * idleReturn
+            } else {
+                p.x += velocityX * dt
+            }
+
+            // clamp 在各自半屏范围，不跨界
+            val minX = if (p.side < 0) 0.02f * w else 0.66f * w
+            val maxX = if (p.side < 0) 0.34f * w else 0.98f * w
+            p.x = p.x.coerceIn(minX, maxX)
+
+            // 纵向轻微呼吸浮动（不飘）
+            p.y += p.driftY * sin(elapsed * 0.6f + p.phase) * dt * 0.6f
+            p.y = p.y.coerceIn(dp(20f), h - dp(20f))
+
+            val sizePulse = 1f + p.sizeAmplitude * sin(elapsed * 1.0f + p.phase)
+            canvas.drawCircle(p.x, p.y, p.radius * sizePulse, fill)
         }
         postInvalidateOnAnimation()
     }
