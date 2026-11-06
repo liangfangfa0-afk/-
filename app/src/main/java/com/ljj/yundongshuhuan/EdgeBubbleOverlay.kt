@@ -35,8 +35,10 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     private var fieldHeight = 0f
     private var lastFrameNanos = 0L
     private var flowX = 0f
+    private var flowY = 0f
     private var flowTurn = 0f
     private var targetX = 0f
+    private var targetY = 0f
     private var targetTurn = 0f
     private var targetAlpha = 0f
     private var motionLevel = 0f
@@ -51,12 +53,18 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         postInvalidateOnAnimation()
     }
 
-    /** 车辆左转(yawRate>0)→气泡向右流；右转→向左流；静止收回两侧并渐隐。 */
+    /**
+     * 驱动气泡：横向(左右) + 纵向(前后) 双轴反向光流。
+     * - 车左转 → 气泡向右流；右转 → 向左流
+     * - 车加速(fy>0，向前) → 气泡向屏幕下方流；减速 → 向上流（与车辆运动反向）
+     * - 静止：收回两侧并渐隐
+     */
     fun updateMotion(x: Float, y: Float, magnitude: Float, yawRate: Float, isStationary: Boolean) {
         val gain = sensitivity / 2.4f
         stationary = isStationary
         if (stationary) {
             targetX = 0f
+            targetY = 0f
             targetTurn = 0f
             targetAlpha = 0f
             motionLevel = 0f
@@ -64,7 +72,8 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             val turnGain = sensitivity * 0.50f
             targetTurn = (yawRate * turnGain).coerceIn(-1.0f, 1.0f)
             targetX = ((-x / 3.2f) * gain + targetTurn).coerceIn(-1.0f, 1.0f)
-            // 运动越强越亮，静止时淡出
+            // 纵向：与车辆前后运动反向。fy>0(向前加速) 时气泡向屏幕下方(+y)流
+            targetY = ((y / 3.2f) * gain).coerceIn(-1.0f, 1.0f)
             val level = (0.55f + magnitude * 0.30f).coerceIn(0f, 1f)
             motionLevel += (level - motionLevel) * 0.15f
             targetAlpha = (0.62f + motionLevel * 0.38f).coerceIn(0f, 1f)
@@ -122,8 +131,10 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         // 速度场：更慢的阻尼 → 运动更顺，不生硬
         val response = 1f - exp(-dt * 2.4f)
         flowX += (targetX - flowX) * response
+        flowY += (targetY - flowY) * response
         flowTurn += (targetTurn - flowTurn) * response
         val velocityX = (flowX + flowTurn) * dp(190f)
+        val velocityY = flowY * dp(165f)
 
         fill.color = colors[paletteIndex]
 
@@ -145,9 +156,11 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
             if (p.x < -margin) p.x = w + margin
             if (p.x > w + margin) p.x = -margin
 
-            // 纵向极缓呼吸
-            p.y += p.driftY * sin(elapsed * 0.45f + p.phase) * dt * 0.5f
-            p.y = p.y.coerceIn(dp(18f), h - dp(18f))
+            // 纵向：前后反向流动（加速向下流、减速向上流）+ 极缓呼吸
+            p.y += (velocityY + p.driftY * sin(elapsed * 0.45f + p.phase) * 0.5f) * dt
+            // 上下出屏后从另一侧绕回
+            if (p.y < -margin) p.y = h + margin
+            if (p.y > h + margin) p.y = -margin
 
             // 渐隐：按目标透明度平滑过渡（静止淡出、运动淡入）
             p.alpha += (targetAlpha - p.alpha) * (1f - exp(-dt * 2.6f))
