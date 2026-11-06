@@ -4,22 +4,23 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
-import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.random.Random
 
-/** 两侧常驻大气泡：左 10 右 10，不透明；静止收回两边，运动时沿方向流动。 */
+/** 两侧常驻气泡：左 10 右 10；静止收回两侧并渐隐，运动时平滑流动。 */
 class EdgeBubbleOverlay(context: Context) : View(context) {
     private data class Particle(
         var x: Float, var y: Float, val radius: Float,
+        var alpha: Float,
         val side: Int,            // -1 = 左侧, +1 = 右侧
         val driftY: Float,
         val phase: Float,
         val sizeAmplitude: Float
     )
 
-    private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
         style = Paint.Style.FILL
         alpha = 255
     }
@@ -37,6 +38,8 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
     private var flowTurn = 0f
     private var targetX = 0f
     private var targetTurn = 0f
+    private var targetAlpha = 0f
+    private var motionLevel = 0f
     private var sensitivity = 4.0f
     private var paletteIndex = 0
     private var elapsed = 0f
@@ -48,17 +51,23 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         postInvalidateOnAnimation()
     }
 
-    /** 车辆左转(yawRate>0)→气泡向右流；右转→向左流；静止收回两边。 */
+    /** 车辆左转(yawRate>0)→气泡向右流；右转→向左流；静止收回两侧并渐隐。 */
     fun updateMotion(x: Float, y: Float, magnitude: Float, yawRate: Float, isStationary: Boolean) {
         val gain = sensitivity / 2.4f
         stationary = isStationary
         if (stationary) {
             targetX = 0f
             targetTurn = 0f
+            targetAlpha = 0f
+            motionLevel = 0f
         } else {
             val turnGain = sensitivity * 0.50f
             targetTurn = (yawRate * turnGain).coerceIn(-1.0f, 1.0f)
             targetX = ((-x / 3.2f) * gain + targetTurn).coerceIn(-1.0f, 1.0f)
+            // 运动越强越亮，静止时淡出
+            val level = (0.55f + magnitude * 0.30f).coerceIn(0f, 1f)
+            motionLevel += (level - motionLevel) * 0.15f
+            targetAlpha = (0.62f + motionLevel * 0.38f).coerceIn(0f, 1f)
         }
         postInvalidateOnAnimation()
     }
@@ -69,25 +78,27 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
         repeat(10) { i ->
             val ty = (i + 0.5f) / 10f
             particles += Particle(
-                x = (0.04f + random.nextFloat() * 0.10f) * w,
-                y = ty * h + (random.nextFloat() - 0.5f) * dp(40f),
-                radius = dp(10f + random.nextFloat() * 8f),
+                x = (0.045f + random.nextFloat() * 0.09f) * w,
+                y = ty * h + (random.nextFloat() - 0.5f) * dp(34f),
+                radius = dp(6f + random.nextFloat() * 4.5f),
+                alpha = 0f,
                 side = -1,
-                driftY = (random.nextFloat() - 0.5f) * dp(10f),
+                driftY = (random.nextFloat() - 0.5f) * dp(6f),
                 phase = random.nextFloat() * 6.28f,
-                sizeAmplitude = 0.06f + random.nextFloat() * 0.06f
+                sizeAmplitude = 0.03f + random.nextFloat() * 0.03f
             )
         }
         repeat(10) { i ->
             val ty = (i + 0.5f) / 10f
             particles += Particle(
-                x = (0.86f + random.nextFloat() * 0.10f) * w,
-                y = ty * h + (random.nextFloat() - 0.5f) * dp(40f),
-                radius = dp(10f + random.nextFloat() * 8f),
+                x = (0.865f + random.nextFloat() * 0.09f) * w,
+                y = ty * h + (random.nextFloat() - 0.5f) * dp(34f),
+                radius = dp(6f + random.nextFloat() * 4.5f),
+                alpha = 0f,
                 side = +1,
-                driftY = (random.nextFloat() - 0.5f) * dp(10f),
+                driftY = (random.nextFloat() - 0.5f) * dp(6f),
                 phase = random.nextFloat() * 6.28f,
-                sizeAmplitude = 0.06f + random.nextFloat() * 0.06f
+                sizeAmplitude = 0.03f + random.nextFloat() * 0.03f
             )
         }
         fieldWidth = w
@@ -104,41 +115,54 @@ class EdgeBubbleOverlay(context: Context) : View(context) {
 
         val now = System.nanoTime()
         val dt = if (lastFrameNanos == 0L) 0.016f
-            else ((now - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.04f)
+            else ((now - lastFrameNanos) / 1_000_000_000f).coerceIn(0.001f, 0.042f)
         lastFrameNanos = now
         elapsed += dt
 
-        val response = 1f - exp(-dt * 4.2f)
+        // 速度场：更慢的阻尼 → 运动更顺，不生硬
+        val response = 1f - exp(-dt * 2.4f)
         flowX += (targetX - flowX) * response
         flowTurn += (targetTurn - flowTurn) * response
-        val velocityX = (flowX + flowTurn) * dp(220f)
+        val velocityX = (flowX + flowTurn) * dp(190f)
 
         fill.color = colors[paletteIndex]
 
-        // 静止时两侧收敛到边缘位置；运动时沿速度场漂移但被 clamp 在各自半屏
-        val leftHomeX = 0.06f * w
-        val rightHomeX = 0.94f * w
-        val idleReturn = if (stationary) 1f - exp(-dt * 3.5f) else 0f
+        val leftHomeX = 0.055f * w
+        val rightHomeX = 0.945f * w
+        val homeFollow = 1f - exp(-dt * 2.2f)
 
         particles.forEach { p ->
-            // 静止时：往 home 位置收
+            // 位置：静止收回各自一侧；运动时平滑漂移
             if (stationary) {
                 val home = if (p.side < 0) leftHomeX else rightHomeX
-                p.x += (home - p.x) * idleReturn
+                p.x += (home - p.x) * homeFollow
             } else {
                 p.x += velocityX * dt
             }
 
-            // clamp 在各自半屏范围，不跨界
+            // 各自半屏范围
             val minX = if (p.side < 0) 0.02f * w else 0.66f * w
             val maxX = if (p.side < 0) 0.34f * w else 0.98f * w
             p.x = p.x.coerceIn(minX, maxX)
 
-            // 纵向轻微呼吸浮动（不飘）
-            p.y += p.driftY * sin(elapsed * 0.6f + p.phase) * dt * 0.6f
-            p.y = p.y.coerceIn(dp(20f), h - dp(20f))
+            // 纵向极缓呼吸
+            p.y += p.driftY * sin(elapsed * 0.45f + p.phase) * dt * 0.5f
+            p.y = p.y.coerceIn(dp(18f), h - dp(18f))
 
-            val sizePulse = 1f + p.sizeAmplitude * sin(elapsed * 1.0f + p.phase)
+            // 渐隐：按目标透明度平滑过渡（静止淡出、运动淡入）
+            p.alpha += (targetAlpha - p.alpha) * (1f - exp(-dt * 2.6f))
+
+            // 贴边额外渐隐，让收进去的气泡自然消失
+            val edgeScale = if (p.side < 0)
+                (p.x / (0.075f * w)).coerceIn(0f, 1f)
+            else
+                ((w - p.x) / (0.075f * w)).coerceIn(0f, 1f)
+            val finalAlpha = (p.alpha * edgeScale).coerceIn(0f, 1f)
+
+            if (finalAlpha < 0.02f) return@forEach
+
+            val sizePulse = 1f + p.sizeAmplitude * sin(elapsed * 0.8f + p.phase)
+            fill.alpha = (finalAlpha * 255f).toInt().coerceIn(0, 255)
             canvas.drawCircle(p.x, p.y, p.radius * sizePulse, fill)
         }
         postInvalidateOnAnimation()
